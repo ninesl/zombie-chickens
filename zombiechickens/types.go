@@ -1,5 +1,15 @@
 package zombiechickens
 
+import "math/rand"
+
+// Shuffle shuffles all elements of a slice in-place and also returns the slice.
+func Shuffle[T any](slice []T) []T {
+	rand.Shuffle(len(slice), func(i, j int) {
+		slice[i], slice[j] = slice[j], slice[i]
+	})
+	return slice
+}
+
 type PlayerPlayChoices struct {
 	// AutoloadShotgun:
 	// - true: Puts Ammo on shotgun with least ammo (ties go to first index)
@@ -14,17 +24,32 @@ type PlayerPlayChoices struct {
 }
 
 type Player struct {
+	Name        string
+	Lives       int
 	Farm        *Farm
-	CardsInHand [5]FarmItemType
+	Hand        Hand
 	PlayChoices PlayerPlayChoices
 }
 
+type Turn uint8
+
+const (
+	Morning Turn = iota
+	Afternoon
+	Night
+	Day // used for co-op
+)
+
+type Players []*Player
+
 type GameState struct {
-	Players             []*Player
+	Players             Players
+	Turn                Turn
 	DayDeck             Stack
 	DiscardedDayCards   map[FarmItemType]int
 	NightDeck           []NightCard
 	DiscardedNightCards []NightCard
+	NightNum            int
 }
 
 type ZombieTrait uint8
@@ -40,100 +65,17 @@ const (
 	NUM_ZOMBIE_TRAITS
 )
 
+type ZombieTraits []ZombieTrait
+
 type ZombieChicken struct {
-	Traits    []ZombieTrait
+	Traits    ZombieTraits
 	NumInDeck int8
 	Name      string
 }
 
-var (
-	ZombieChickens = map[int]ZombieChicken{
-		1: {
-			Name:      "Raider",
-			NumInDeck: 2,
-			Traits:    []ZombieTrait{Flying, Bulletproof},
-		},
-		2: {
-			Name:      "Walker",
-			NumInDeck: 4,
-			Traits:    []ZombieTrait{Fireproof, Exploding},
-		},
-		3: {
-			Name:      "Chomper",
-			NumInDeck: 2,
-			Traits:    []ZombieTrait{Bulletproof, Fireproof, Timid},
-		},
-		4: {
-			Name:      "Crawler",
-			NumInDeck: 2,
-			Traits:    []ZombieTrait{Climbing, Bulletproof},
-		},
-		5: {
-			Name:      "Climber",
-			NumInDeck: 2,
-			Traits:    []ZombieTrait{Climbing, Fireproof, Exploding},
-		},
-		6: {
-			Name:      "Clucker",
-			NumInDeck: 2,
-			Traits:    []ZombieTrait{Exploding},
-		},
-		7: {
-			Name:      "Kablooey",
-			NumInDeck: 4,
-			Traits:    []ZombieTrait{Flying, Exploding},
-		},
-		8: {
-			Name:      "Biter",
-			NumInDeck: 10,
-			Traits:    []ZombieTrait{Flying, Fireproof},
-		},
-		9: {
-			Name:      "Blaster",
-			NumInDeck: 2,
-			Traits:    []ZombieTrait{Flying, Timid, Exploding},
-		},
-		10: {
-			Name:      "Boomer",
-			NumInDeck: 6,
-			Traits:    []ZombieTrait{Flying, Bulletproof, Exploding},
-		},
-		11: {
-			Name:      "Stalker",
-			NumInDeck: 4,
-			Traits:    []ZombieTrait{Invisible, Exploding},
-		},
-		12: {
-			Name:      "Thunder",
-			NumInDeck: 2,
-			Traits:    []ZombieTrait{Invisible, Flying, Timid, Exploding},
-		},
-		13: {
-			Name:      "Floater",
-			NumInDeck: 2,
-			Traits:    []ZombieTrait{Invisible, Flying, Timid},
-		},
-		14: {
-			Name:      "Toaster",
-			NumInDeck: 2,
-			Traits:    []ZombieTrait{Flying, Fireproof, Timid, Exploding},
-		},
-		15: {
-			Name:      "Sneaker",
-			NumInDeck: 2,
-			Traits:    []ZombieTrait{Invisible, Climbing},
-		},
-		16: {
-			Name:      "Creeper",
-			NumInDeck: 6,
-			Traits:    []ZombieTrait{Invisible},
-		},
-	}
-)
-
 type Event struct {
-	Action func(*Farm, *GameState)
-	Name   string
+	Action            func(*GameState)
+	Name, Description string
 }
 
 var (
@@ -141,72 +83,80 @@ var (
 	NightCardEvents = []Event{
 		{
 			Name: "Tornado",
-			Action: func(f *Farm, g *GameState) {
+			Action: func(g *GameState) {
 				// All players discards 3 cards from their farm
 			},
 		},
 		{
 			Name: "Lightning Storm",
-			Action: func(f *Farm, g *GameState) {
+			Action: func(g *GameState) {
 				// All players discards 2 cards from their farm
 			},
 		},
 		{
-			Name: "Blood Moon",
-			Action: func(f *Farm, g *GameState) {
-				// Zombies are flocking tonight!
-				// All players draw 3 more Night cards
-
-				f.NightCards = append(f.NightCards, g.NextNightCard())
-				f.NightCards = append(f.NightCards, g.NextNightCard())
-				f.NightCards = append(f.NightCards, g.NextNightCard())
-			},
-		},
-		{
-			Name: "Winter Solstice",
-			Action: func(f *Farm, g *GameState) {
-				// It's gonna be a long night!
-				// All players draw 2 more Night cards
-				f.NightCards = append(f.NightCards, g.NextNightCard())
-				f.NightCards = append(f.NightCards, g.NextNightCard())
-			},
-		},
-		{
-			Name: "Squirrel Stampede",
-			Action: func(f *Farm, g *GameState) {
-				// A squirrel stampede triggers all
-				// Booby Traps! All players discard
-				// any Booby Traps on their farm.
-
-				for i := range f.Stacks {
-					f.Stacks[i] = f.Stacks[i].RemoveItem(BoobyTrap)
+			Name:        "Blood Moon",
+			Description: "Zombies are flocking tonight!\nAll players draw 3 more Night cards.",
+			Action: func(g *GameState) {
+				for _, player := range g.Players {
+					player.Farm.NightCards = append(player.Farm.NightCards, g.NextNightCard())
+					player.Farm.NightCards = append(player.Farm.NightCards, g.NextNightCard())
+					player.Farm.NightCards = append(player.Farm.NightCards, g.NextNightCard())
 				}
 			},
 		},
 		{
-			Name: "Heavy Rainfall",
-			Action: func(f *Farm, g *GameState) {
-				// Water rusts Flamethrowers! All
-				// players discard any Flamethrowers
-				// and Fuel on their farm.
-
-				for i := range f.Stacks {
-					f.Stacks[i] = f.Stacks[i].RemoveItem(Flamethrower).RemoveItem(Fuel)
+			Name:        "Winter Solstice",
+			Description: "It's gonna be a long night! All players draw 2 more Night cards.",
+			Action: func(g *GameState) {
+				for _, player := range g.Players {
+					player.Farm.NightCards = append(player.Farm.NightCards, g.NextNightCard())
+					player.Farm.NightCards = append(player.Farm.NightCards, g.NextNightCard())
 				}
 			},
 		},
 		{
-			Name: "Silent Night",
-			Action: func(f *Farm, g *GameState) {
-				// No more zombies tonight!
-				// All players discard any
-				// remaining Night cards.
+			Name:        "Squirrel Stampede",
+			Description: "A squirrel stampede triggers all Booby Traps! All players discard any Booby Traps on their farm.",
+			Action: func(g *GameState) {
+				for i := range g.Players {
+					if g.Players[i].Farm.HasItemInStacks(BoobyTrap) {
+						// could have better/more performant logic here. need to benchmark
+						for j := range g.Players[i].Farm.Stacks {
+							g.Players[i].Farm.Stacks[j].RemoveItem(BoobyTrap)
+						}
+					}
 
-				for _, card := range f.NightCards {
-					g.DiscardNightCard(card)
+					g.Players[i].Farm.clearStacks()
 				}
+			},
+		},
+		{
+			Name:        "Heavy Rainfall",
+			Description: "Water rusts Flamethrowers! All players discard any Flamethrowers and Fuel on their farm.",
+			Action: func(g *GameState) {
+				for i := range g.Players {
+					if g.Players[i].Farm.HasItemInStacks(Fuel) {
+						// could have better/more performant logic here. need to benchmark
+						for j := range g.Players[i].Farm.Stacks {
+							g.Players[i].Farm.Stacks[j].RemoveItem(BoobyTrap)
+						}
+					}
 
-				f.NightCards = f.NightCards[:0]
+					g.Players[i].Farm.clearStacks()
+				}
+			},
+		},
+		{
+			Name:        "Silent Night",
+			Description: "No more zombies tonight! All players discard any remaining Night cards.",
+			Action: func(g *GameState) {
+				for _, player := range g.Players {
+					for _, card := range player.Farm.NightCards {
+						g.DiscardNightCard(card)
+					}
+					player.Farm.NightCards = player.Farm.NightCards[:0] // clear
+
+				}
 			},
 		},
 	}
@@ -221,6 +171,8 @@ type NightCard struct {
 	Event     Event
 	ZombieKey int
 }
+
+type NightCards []NightCard
 
 // redundant with IsEvent
 func (n NightCard) IsZombie() bool {
@@ -246,31 +198,6 @@ const (
 	WOLR                             //  4 | Destroys and 1 zombie plus everything else on your farm (1-Time-Use)
 	NUM_FARM_ITEMS
 )
-
-func (f FarmItemType) String() string {
-	switch f {
-	case HayBale:
-		return "Hay Bale"
-	case Scarecrow:
-		return "Scarecrow"
-	case Shotgun:
-		return "Shotgun"
-	case Ammo:
-		return "Ammo"
-	case BoobyTrap:
-		return "Booby Trap"
-	case Shield:
-		return "Shield"
-	case Flamethrower:
-		return "Flamethrower"
-	case Fuel:
-		return "Fuel"
-	case WOLR:
-		return "W.O.L.R"
-	default:
-		return ""
-	}
-}
 
 func (f FarmItemType) IsOneTimeUse() bool {
 	switch f {
@@ -331,17 +258,25 @@ var (
 )
 
 type Stack []FarmItemType
+type Stacks []Stack
 
-func (s Stack) RemoveItem(item FarmItemType) Stack {
-	for i, card := range s {
+func (s *Stack) RemoveItem(item FarmItemType) {
+	for i, card := range *s {
 		if card == item {
-			return append(s[:i], s[i+1:]...)
+			*s = append((*s)[:i], (*s)[i+1:]...)
+			return
 		}
 	}
-	return s
 }
 
+type HandItem struct {
+	FarmItemType FarmItemType
+	Visible      bool // returns true if visible to other players. used for front end
+}
+
+type Hand [5]HandItem
+
 type Farm struct {
-	Stacks     []Stack
-	NightCards []NightCard // current night cards being attacked from
+	Stacks     Stacks
+	NightCards NightCards // current night cards being attacked from
 }
