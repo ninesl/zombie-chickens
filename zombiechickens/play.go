@@ -1,0 +1,303 @@
+package zombiechickens
+
+import (
+	"errors"
+	"fmt"
+)
+
+// countItemInStack returns how many times item appears in stack
+func countItemInStack(stack Stack, item FarmItemType) int {
+	count := 0
+	for _, card := range stack {
+		if card == item {
+			count++
+		}
+	}
+	return count
+}
+
+// findStacks returns indices of all stacks containing ALL of the specified items
+// Example: findStacks(Stack{Shotgun}) finds all stacks with at least 1 Shotgun
+// Example: findStacks(Stack{Shotgun, Ammo}) finds all stacks with both Shotgun AND Ammo
+func (f *Farm) findStacks(items Stack) []int {
+	result := []int{}
+	for i, stack := range f.Stacks {
+		hasAll := true
+		for _, item := range items {
+			if !stack.HasItem(item) {
+				hasAll = false
+				break
+			}
+		}
+		if hasAll {
+			result = append(result, i)
+		}
+	}
+	return result
+}
+
+func (f *Farm) PlayCard(item FarmItemType, choices PlayerPlayChoices) error {
+	if f.Stacks == nil {
+		f.Stacks = make([]Stack, 0)
+	}
+
+	// Empty farm - always create new stack
+	if len(f.Stacks) == 0 {
+		f.makeStackWith(item)
+		return nil
+	}
+
+	switch item {
+	case Scarecrow, BoobyTrap, Shield, WOLR:
+		// Simple items - always new stack
+		f.makeStackWith(item)
+
+	case Flamethrower:
+		// Find fuel-only stacks (has Fuel, no Flamethrower)
+		fuelStacks := f.findStacks(Stack{Fuel})
+		fuelOnlyStacks := []int{}
+		for _, idx := range fuelStacks {
+			if !f.Stacks[idx].HasItem(Flamethrower) {
+				fuelOnlyStacks = append(fuelOnlyStacks, idx)
+			}
+		}
+		if len(fuelOnlyStacks) > 0 {
+			// Add to first unpaired Fuel
+			f.Stacks[fuelOnlyStacks[0]] = append(f.Stacks[fuelOnlyStacks[0]], Flamethrower)
+		} else {
+			f.makeStackWith(Flamethrower)
+		}
+
+	case Fuel:
+		// Find flamethrower stacks without Fuel
+		flamethrowerStacks := f.findStacks(Stack{Flamethrower})
+		unfueledStacks := []int{}
+		for _, idx := range flamethrowerStacks {
+			if !f.Stacks[idx].HasItem(Fuel) {
+				unfueledStacks = append(unfueledStacks, idx)
+			}
+		}
+		if len(unfueledStacks) > 0 {
+			// Add to first unpaired Flamethrower
+			f.Stacks[unfueledStacks[0]] = append(f.Stacks[unfueledStacks[0]], Fuel)
+		} else {
+			f.makeStackWith(Fuel)
+		}
+
+	case Shotgun:
+		// Find ammo-only stacks (has Ammo, no Shotgun)
+		ammoStacks := f.findStacks(Stack{Ammo})
+		ammoOnlyStacks := []int{}
+		for _, idx := range ammoStacks {
+			if !f.Stacks[idx].HasItem(Shotgun) {
+				ammoOnlyStacks = append(ammoOnlyStacks, idx)
+			}
+		}
+		if len(ammoOnlyStacks) > 0 {
+			if choices.AutoloadShotgun {
+				// Find the ammo stack with MOST ammo (same stack always if choice was always on)
+				maxAmmoCount := 0
+				maxAmmoIdx := ammoOnlyStacks[0]
+				for _, idx := range ammoOnlyStacks {
+					count := countItemInStack(f.Stacks[idx], Ammo)
+					if count > maxAmmoCount {
+						maxAmmoCount = count
+						maxAmmoIdx = idx
+					}
+				}
+				f.Stacks[maxAmmoIdx] = append(f.Stacks[maxAmmoIdx], Shotgun)
+			} else {
+				return &NeedsPlayerInputError{
+					Item:        Ammo,
+					ValidStacks: ammoStacks, // can choose any shotgun
+					Message:     "choose to load shotgun with ammo or start new stack",
+				}
+			}
+		} else {
+			f.makeStackWith(Shotgun)
+		}
+
+	case Ammo:
+		shotgunStacks := f.findStacks(Stack{Shotgun})
+
+		if len(shotgunStacks) == 0 {
+			// No shotguns - find ammo-only stack with most ammo, or create new
+			ammoStacks := f.findStacks(Stack{Ammo})
+			ammoOnlyStacks := []int{}
+			for _, idx := range ammoStacks {
+				if !f.Stacks[idx].HasItem(Shotgun) {
+					ammoOnlyStacks = append(ammoOnlyStacks, idx)
+				}
+			}
+			if len(ammoOnlyStacks) > 0 {
+				if choices.AutoloadShotgun {
+					// most ammo again
+					maxAmmoCount := 0
+					maxAmmoIdx := ammoOnlyStacks[0]
+					for _, idx := range ammoOnlyStacks {
+						count := countItemInStack(f.Stacks[idx], Ammo)
+						if count > maxAmmoCount {
+							maxAmmoCount = count
+							maxAmmoIdx = idx
+						}
+					}
+					f.Stacks[maxAmmoIdx] = append(f.Stacks[maxAmmoIdx], Ammo)
+				} else {
+					return &NeedsPlayerInputError{
+						Item:        Ammo,
+						ValidStacks: shotgunStacks, // can choose any shotgun
+						Message:     "choose which shotgun to load with ammo",
+					}
+				}
+			} else {
+				f.makeStackWith(Ammo)
+			}
+		} else if choices.AutoloadShotgun {
+			// Find shotgun with LEAST ammo (ties go to first index)
+			minAmmoCount := -1
+			minAmmoIdx := shotgunStacks[0]
+			for _, idx := range shotgunStacks {
+				count := countItemInStack(f.Stacks[idx], Ammo)
+				if minAmmoCount == -1 || count < minAmmoCount {
+					minAmmoCount = count
+					minAmmoIdx = idx
+				} else if count == minAmmoCount && idx < minAmmoIdx {
+					minAmmoIdx = idx // tie-breaker: first index
+				}
+			}
+			f.Stacks[minAmmoIdx] = append(f.Stacks[minAmmoIdx], Ammo)
+		} else if len(shotgunStacks) == 1 {
+			numAmmo := countItemInStack(f.Stacks[shotgunStacks[0]], Ammo)
+			if numAmmo == 0 { // TODO: could be annoying as this is auto behavior without setting on
+				f.Stacks[shotgunStacks[0]] = append(f.Stacks[shotgunStacks[0]], Ammo)
+			} else {
+				return &NeedsPlayerInputError{
+					Item:        Ammo,
+					ValidStacks: shotgunStacks, // can choose any shotgun
+					Message:     "choose to load shotgun or start new ammo stack",
+				}
+			}
+		} else {
+			return &NeedsPlayerInputError{
+				Item:        Ammo,
+				ValidStacks: shotgunStacks, // can choose any shotgun
+				Message:     "choose which shotgun to load with ammo",
+			}
+		}
+
+	case HayBale:
+		hayBaleStacks := f.findStacks(Stack{HayBale})
+
+		// Filter for incomplete walls (<3 HayBales)
+		incompleteWalls := []int{}
+		for _, idx := range hayBaleStacks {
+			count := countItemInStack(f.Stacks[idx], HayBale)
+			if count < 3 {
+				incompleteWalls = append(incompleteWalls, idx)
+			}
+		}
+
+		if len(incompleteWalls) == 0 {
+			// No incomplete walls - create new stack
+			f.makeStackWith(HayBale)
+		} else if choices.AutoBuildHayWall {
+			// Find wall with MOST HayBales (but still <3)
+			maxCount := 0
+			maxIdx := incompleteWalls[0]
+			for _, idx := range incompleteWalls {
+				count := countItemInStack(f.Stacks[idx], HayBale)
+				if count > maxCount {
+					maxCount = count
+					maxIdx = idx
+				} else if count == maxCount && idx < maxIdx {
+					maxIdx = idx // tie-breaker: first index
+				}
+			}
+			f.Stacks[maxIdx] = append(f.Stacks[maxIdx], HayBale)
+		} else if len(incompleteWalls) == 1 {
+			numHay := countItemInStack(f.Stacks[incompleteWalls[0]], HayBale)
+			if numHay == 1 { // TODO: could be annoying as this is auto behavior without setting on
+				f.Stacks[incompleteWalls[0]] = append(f.Stacks[incompleteWalls[0]], HayBale)
+			} else {
+				return &NeedsPlayerInputError{
+					Item:        HayBale,
+					ValidStacks: incompleteWalls, // can choose any wall
+					Message:     "choose to complete wall or start new one",
+				}
+			}
+		} else {
+			return &NeedsPlayerInputError{
+				Item:        HayBale,
+				ValidStacks: incompleteWalls,
+				Message:     "choose which hay wall to build",
+			}
+		}
+	}
+
+	f.clearStacks()
+
+	if err := f.assertLegalStacks(); err != nil {
+		return fmt.Errorf("failed to play %s: %w", item, err)
+	}
+
+	return nil
+}
+
+func (f *Farm) makeStackWith(item FarmItemType) {
+	var stack = make(Stack, 0, 1)
+	stack = append(stack, item)
+	f.Stacks = append(f.Stacks, stack)
+}
+
+var ErrNeedsPlayerInput = errors.New("needs player input")
+
+type NeedsPlayerInputError struct {
+	Item        FarmItemType
+	ValidStacks []int  // indices of valid stacks player can choose from
+	Message     string // human-readable description
+}
+
+func (e *NeedsPlayerInputError) Error() string {
+	return "needs player input: " + e.Message
+}
+
+// Adds item to specific f.Stacks[index]. Does not do any checking, allows illegal Stacks
+func (f *Farm) addToStackIndex(item FarmItemType, stackIndex int) error {
+	if stackIndex >= len(f.Stacks) {
+		return fmt.Errorf("%d out of bounds, length of farm stacks is %d", stackIndex, len(f.Stacks))
+	} else if stackIndex < 0 {
+		return fmt.Errorf("%d must be a postive number", stackIndex)
+	}
+
+	f.Stacks[stackIndex] = append(f.Stacks[stackIndex], item)
+	return nil
+}
+
+func (s Stack) HasItem(item FarmItemType) bool {
+	for _, card := range s {
+		if card == item {
+			return true
+		}
+	}
+	return false
+}
+
+// returns true and the index of the first f.Stacks that contains the item
+// returns false and -1 if item does not exist in farm
+func (f *Farm) HasItemInStacks(item FarmItemType) (int, bool) {
+	for i, stack := range f.Stacks {
+		if stack.HasItem(item) {
+			return i, true
+		}
+	}
+	return -1, false
+}
+
+// removes all Stacks from f.Stacks where len(f.Stacks[i]) == 0
+func (f *Farm) clearStacks() {
+	for i := len(f.Stacks) - 1; i >= 0; i-- {
+		if len(f.Stacks[i]) == 0 {
+			f.Stacks = append(f.Stacks[:i], f.Stacks[i+1:]...)
+		}
+	}
+}

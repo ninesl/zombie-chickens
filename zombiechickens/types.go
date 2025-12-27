@@ -1,13 +1,22 @@
 package zombiechickens
 
-import (
-	"errors"
-	"fmt"
-)
+type PlayerPlayChoices struct {
+	// AutoloadShotgun:
+	// - true: Puts Ammo on shotgun with least ammo (ties go to first index)
+	//         Also places Shotgun on Ammo stack with most ammo
+	// - false: Puts Ammo on unloaded shotgun if exactly 1, else ErrNeedsPlayerInput
+	AutoloadShotgun bool
+
+	// AutoBuildHayWall:
+	// - true: Puts HayBale on incomplete wall with most HayBales (but <3)
+	// - false: Puts HayBale on incomplete wall if exactly 1, else ErrNeedsPlayerInput
+	AutoBuildHayWall bool
+}
 
 type Player struct {
 	Farm        *Farm
 	CardsInHand [5]FarmItemType
+	PlayChoices PlayerPlayChoices
 }
 
 type GameState struct {
@@ -168,6 +177,10 @@ var (
 				// A squirrel stampede triggers all
 				// Booby Traps! All players discard
 				// any Booby Traps on their farm.
+
+				for i := range f.Stacks {
+					f.Stacks[i] = f.Stacks[i].RemoveItem(BoobyTrap)
+				}
 			},
 		},
 		{
@@ -176,6 +189,10 @@ var (
 				// Water rusts Flamethrowers! All
 				// players discard any Flamethrowers
 				// and Fuel on their farm.
+
+				for i := range f.Stacks {
+					f.Stacks[i] = f.Stacks[i].RemoveItem(Flamethrower).RemoveItem(Fuel)
+				}
 			},
 		},
 		{
@@ -205,29 +222,6 @@ type NightCard struct {
 	ZombieKey int
 }
 
-func CreateNightCardDeck() []NightCard {
-	var (
-		deck = make([]NightCard, 0)
-	)
-
-	for zIndex, chickenType := range ZombieChickens {
-		for range chickenType.NumInDeck {
-			deck = append(deck, NightCard{
-				ZombieKey: zIndex,
-			})
-		}
-	}
-
-	for _, event := range NightCardEvents {
-		deck = append(deck, NightCard{
-			Event:     event,
-			ZombieKey: -1,
-		})
-	}
-
-	return deck
-}
-
 // redundant with IsEvent
 func (n NightCard) IsZombie() bool {
 	return n.ZombieKey != -1
@@ -239,6 +233,19 @@ func (n NightCard) IsEvent() bool {
 }
 
 type FarmItemType uint16
+
+const (
+	HayBale      FarmItemType = iota // 20 | Stack 3 Hay Bales to build a Hay Wall
+	Scarecrow                        //  6 | Scares away Timid Zombies
+	Shotgun                          // 14 | Combies with Ammo to blast a zombie
+	Ammo                             // 24 | Combine with Shotgun to blast a zombie (1-Time-Use)
+	BoobyTrap                        // 10 | Terminates 1 Zombie (1-Time-Use)
+	Shield                           //  6 | Shields a stack from an Exploding Zombie (1-Time-Use)
+	Flamethrower                     //  6 | Combine with Fuel to roast a zombie
+	Fuel                             //  6 | Combine with Flamethrower to roast a zombie
+	WOLR                             //  4 | Destroys and 1 zombie plus everything else on your farm (1-Time-Use)
+	NUM_FARM_ITEMS
+)
 
 func (f FarmItemType) String() string {
 	switch f {
@@ -273,19 +280,6 @@ func (f FarmItemType) IsOneTimeUse() bool {
 		return false
 	}
 }
-
-const (
-	HayBale      FarmItemType = iota // 20 | Stack 3 Hay Bales to build a Hay Wall
-	Scarecrow                        //  6 | Scares away Timid Zombies
-	Shotgun                          // 14 | Combies with Ammo to blast a zombie
-	Ammo                             // 24 | Combine with Shotgun to blast a zombie (1-Time-Use)
-	BoobyTrap                        // 10 | Terminates 1 Zombie (1-Time-Use)
-	Shield                           //  6 | Shields a stack from an Exploding Zombie (1-Time-Use)
-	Flamethrower                     //  6 | Combine with Fuel to roast a zombie
-	Fuel                             //  6 | Combine with Flamethrower to roast a zombie
-	WOLR                             //  4 | Destroys and 1 zombie plus everything else on your farm (1-Time-Use)
-	NUM_FARM_ITEMS
-)
 
 var (
 	// needed to check if every farm item in stack exists uniquely (3 unique hay bales, 1 shotgun + any # ammo...)
@@ -338,68 +332,16 @@ var (
 
 type Stack []FarmItemType
 
+func (s Stack) RemoveItem(item FarmItemType) Stack {
+	for i, card := range s {
+		if card == item {
+			return append(s[:i], s[i+1:]...)
+		}
+	}
+	return s
+}
+
 type Farm struct {
 	Stacks     []Stack
-	NightCards []NightCard // current night cards being attacked with
-}
-
-func (f *Farm) PlayCard(item FarmItemType) {
-	if f.Stacks == nil {
-		f.Stacks = make([]Stack, 0)
-	}
-
-	err := f.AddToStacks(item)
-	if err != nil {
-		if errors.Is(err, ErrNeedsPlayerInput) {
-			// handle player input, add to input stack?
-		} else {
-			//TODO:FIXME:
-			panic(err)
-		}
-	}
-
-	err = f.AddToStacks(item)
-}
-
-func (f *Farm) makeStackWith(item FarmItemType) {
-	var stack = make(Stack, 0, 1)
-	stack = append(stack, item)
-	f.Stacks = append(f.Stacks, stack)
-}
-
-var ErrNeedsPlayerInput = errors.New("needs player input")
-
-//("needs player input")
-
-func (f *Farm) addToStackIndex(item FarmItemType, stackIndex int) error {
-	if stackIndex >= len(f.Stacks) {
-		return fmt.Errorf("%d out of bounds, length of farm stacks is %d", stackIndex, f.Stacks)
-	} else if stackIndex < 0 {
-		return fmt.Errorf("%d must be a postive number", stackIndex)
-	}
-	return nil
-}
-
-func (f *Farm) HasItemInStacks(item FarmItemType) bool {
-	for _, stack := range f.Stacks {
-		for _, card := range stack {
-			if card == item {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func (f *Farm) AddToStacks(item FarmItemType) error {
-	if len(f.Stacks) > 0 {
-		f.makeStackWith(item)
-		return nil
-	}
-
-	// hasItem := f.HasItemInStacks(item)
-
-	// f.Stacks[stackIndex] = append(f.Stacks[stackIndex], item)
-
-	return nil
+	NightCards []NightCard // current night cards being attacked from
 }
