@@ -329,6 +329,11 @@ func (g *GameState) discardCardsFromAllFarms(n int) {
 	for _, player := range g.Players {
 		totalItems := player.Farm.Stacks.TotalItems()
 
+		// Skip players with no farm items
+		if totalItems == 0 {
+			continue
+		}
+
 		// If n >= total items, discard everything
 		if n >= totalItems {
 			for _, stack := range player.Farm.Stacks {
