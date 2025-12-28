@@ -81,20 +81,20 @@ func CreateNewGame(playerNames ...string) (*GameState, error) {
 	return g, nil
 }
 
-// DebugEventsOnTop puts Lightning Storm and Tornado as the first 2 cards,
+// DebugEventsOnTop puts Blood Moon and Winter Solstice as the first 2 cards,
 // then other events, then zombies.
 func (g *GameState) DebugEventsOnTop() {
-	// Find Lightning Storm and Tornado specifically
-	var lightningStorm, tornado NightCard
+	// Find Blood Moon and Winter Solstice specifically
+	var bloodMoon, winterSolstice NightCard
 	otherEvents := make([]NightCard, 0)
 	zombies := make([]NightCard, 0)
 
 	for _, card := range g.NightDeck {
 		if card.IsEvent() {
-			if card.Event.Name == "Lightning Storm" {
-				lightningStorm = card
-			} else if card.Event.Name == "Tornado" {
-				tornado = card
+			if card.Event.Name == "Blood Moon" {
+				bloodMoon = card
+			} else if card.Event.Name == "Winter Solstice" {
+				winterSolstice = card
 			} else {
 				otherEvents = append(otherEvents, card)
 			}
@@ -103,8 +103,8 @@ func (g *GameState) DebugEventsOnTop() {
 		}
 	}
 
-	// Lightning Storm first, Tornado second, then other events, then zombies
-	g.NightDeck = append([]NightCard{lightningStorm, tornado}, otherEvents...)
+	// Blood Moon first, Winter Solstice second, then other events, then zombies
+	g.NightDeck = append([]NightCard{bloodMoon, winterSolstice}, otherEvents...)
 	g.NightDeck = append(g.NightDeck, zombies...)
 }
 
