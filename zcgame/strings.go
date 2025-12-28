@@ -156,18 +156,18 @@ func (n NightCards) StringWithVisibility(isCurrentPlayer bool, turn Turn) string
 		return ""
 	}
 
-	// Always show count as "NightCard x N" format
-	countStr := fmt.Sprintf("NightCard x %d", len(n))
-
 	if !isCurrentPlayer {
-		return countStr
+		// Show total count for non-current players
+		return fmt.Sprintf("NightCard x %d", len(n))
 	}
 
-	// For current player, show count plus the first card details
+	// For current player showing a card, count is remaining cards (len - 1)
 	if len(n) == 0 {
-		return countStr
+		return "NightCard x 0"
 	}
 
+	remainingCount := len(n) - 1
+	countStr := fmt.Sprintf("NightCard x %d", remainingCount)
 	card := n[0]
 
 	if card.IsZombie() {
