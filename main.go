@@ -26,11 +26,37 @@ func main() {
 		game.DebugEventsOnTop()
 	}
 
+	// Game loop with input handling
 	for {
-		zcgame.RefreshRender(game)
-		if !game.DoDay() {
-			fmt.Println("GAME OVER - All players have been eliminated!")
-			break
+		// Try to advance the game
+		gameOver, inputNeeded := game.DoDay()
+
+		if inputNeeded != nil {
+			// CLI mode: gather input and continue
+			if !zcgame.CLIMode {
+				log.Fatal("Player input needed but not in CLI mode: ", inputNeeded.Message)
+			}
+
+			input := zcgame.GatherCLIInput(game, inputNeeded)
+
+			// Provide input and continue
+			for {
+				gameOver, inputNeeded = game.ContinueAfterInput(input)
+				if inputNeeded == nil {
+					break
+				}
+				input = zcgame.GatherCLIInput(game, inputNeeded)
+			}
 		}
+
+		if gameOver {
+			// Day completed successfully, show state and continue
+			zcgame.RefreshRender(game)
+			continue
+		}
+
+		// Game over - all players eliminated
+		fmt.Println("GAME OVER - All players have been eliminated!")
+		break
 	}
 }
