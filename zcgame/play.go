@@ -1,7 +1,6 @@
 package zcgame
 
 import (
-	"errors"
 	"fmt"
 )
 
@@ -36,7 +35,7 @@ func (f *Farm) findStacks(items Stack) []int {
 	return result
 }
 
-func (f *Farm) PlayCard(item FarmItemType, choices PlayerPlayChoices) error {
+func (f *Farm) PlayCard(item FarmItemType, choices PlayerPlayChoices) *PlayCardResult {
 	if f.Stacks == nil {
 		f.Stacks = make([]Stack, 0)
 	}
@@ -104,9 +103,8 @@ func (f *Farm) PlayCard(item FarmItemType, choices PlayerPlayChoices) error {
 				}
 				f.Stacks[maxAmmoIdx] = append(f.Stacks[maxAmmoIdx], Shotgun)
 			} else {
-				return &NeedsPlayerInputError{
-					Item:        Ammo,
-					ValidStacks: ammoStacks, // can choose any shotgun
+				return &PlayCardResult{
+					ValidStacks: ammoStacks,
 					Message:     "choose to load shotgun with ammo or start new stack",
 				}
 			}
@@ -160,16 +158,14 @@ func (f *Farm) PlayCard(item FarmItemType, choices PlayerPlayChoices) error {
 			if numAmmo == 0 { // TODO: could be annoying as this is auto behavior without setting on
 				f.Stacks[shotgunStacks[0]] = append(f.Stacks[shotgunStacks[0]], Ammo)
 			} else {
-				return &NeedsPlayerInputError{
-					Item:        Ammo,
-					ValidStacks: shotgunStacks, // can choose any shotgun
+				return &PlayCardResult{
+					ValidStacks: shotgunStacks,
 					Message:     "choose to load shotgun or start new ammo stack",
 				}
 			}
 		} else {
-			return &NeedsPlayerInputError{
-				Item:        Ammo,
-				ValidStacks: shotgunStacks, // can choose any shotgun
+			return &PlayCardResult{
+				ValidStacks: shotgunStacks,
 				Message:     "choose which shotgun to load with ammo",
 			}
 		}
@@ -205,15 +201,13 @@ func (f *Farm) PlayCard(item FarmItemType, choices PlayerPlayChoices) error {
 			if numHay == 1 { // TODO: could be annoying as this is auto behavior without setting on
 				f.Stacks[incompleteWalls[0]] = append(f.Stacks[incompleteWalls[0]], HayBale)
 			} else {
-				return &NeedsPlayerInputError{
-					Item:        HayBale,
-					ValidStacks: incompleteWalls, // can choose any wall
+				return &PlayCardResult{
+					ValidStacks: incompleteWalls,
 					Message:     "choose to complete wall or start new one",
 				}
 			}
 		} else {
-			return &NeedsPlayerInputError{
-				Item:        HayBale,
+			return &PlayCardResult{
 				ValidStacks: incompleteWalls,
 				Message:     "choose which hay wall to build",
 			}
@@ -221,11 +215,6 @@ func (f *Farm) PlayCard(item FarmItemType, choices PlayerPlayChoices) error {
 	}
 
 	f.clearStacks()
-
-	if err := f.assertLegalStacks(); err != nil {
-		return fmt.Errorf("failed to play %s: %w", item, err)
-	}
-
 	return nil
 }
 
@@ -235,7 +224,12 @@ func (f *Farm) makeStackWith(item FarmItemType) {
 	f.Stacks = append(f.Stacks, stack)
 }
 
-var ErrNeedsPlayerInput = errors.New("needs player input")
+// PlayCardResult is returned when PlayCard needs player input to decide
+// where to place a card. A nil result means the card was played successfully.
+type PlayCardResult struct {
+	ValidStacks []int  // valid stack indices the player can choose from
+	Message     string // human-readable prompt
+}
 
 // InputContext specifies what type of input is being requested
 type InputContext uint8
@@ -278,9 +272,6 @@ type PlayerInputNeeded struct {
 func (e *PlayerInputNeeded) Error() string {
 	return "needs player input: " + e.Message
 }
-
-// Legacy type alias for backwards compatibility with PlayCard
-type NeedsPlayerInputError = PlayerInputNeeded
 
 // Adds item to specific f.Stacks[index]. Does not do any checking, allows illegal Stacks
 func (f *Farm) addToStackIndex(item FarmItemType, stackIndex int) error {

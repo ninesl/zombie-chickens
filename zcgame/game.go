@@ -126,27 +126,28 @@ func (g *GameState) DoPlayerDayTurn() *PlayerInputNeeded {
 func (g *GameState) createStackSelectionInput() *PlayerInputNeeded {
 	player := g.CurrentPlayer()
 
-	// Get valid stacks from a test PlayCard call
-	err := player.Farm.PlayCard(g.PendingCardItem, player.PlayChoices)
-	if inputErr, ok := err.(*PlayerInputNeeded); ok {
-		// Convert 0-based stack indices to 1-based for display, add 0 for "new stack"
-		choices := make([]int, len(inputErr.ValidStacks)+1)
-		choices[0] = 0 // new stack option
-		for i, idx := range inputErr.ValidStacks {
-			choices[i+1] = idx + 1
-		}
-
-		return &PlayerInputNeeded{
-			Context:      InputContextPlayCard,
-			RenderType:   RenderNormal,
-			Message:      fmt.Sprintf("%s: %s (0 for new stack, or choose stack)", g.PendingCardItem, inputErr.Message),
-			ValidChoices: choices,
-			Item:         g.PendingCardItem,
-			ValidStacks:  inputErr.ValidStacks,
-		}
+	// Get valid stacks from PlayCard
+	result := player.Farm.PlayCard(g.PendingCardItem, player.PlayChoices)
+	if result == nil {
+		// Card was auto-played, no input needed
+		return nil
 	}
-	// Should not reach here - PlayCard should have returned an error
-	return nil
+
+	// Convert 0-based stack indices to 1-based for display, add 0 for "new stack"
+	choices := make([]int, len(result.ValidStacks)+1)
+	choices[0] = 0 // new stack option
+	for i, idx := range result.ValidStacks {
+		choices[i+1] = idx + 1
+	}
+
+	return &PlayerInputNeeded{
+		Context:      InputContextPlayCard,
+		RenderType:   RenderNormal,
+		Message:      fmt.Sprintf("%s: %s (0 for new stack, or choose stack)", g.PendingCardItem, result.Message),
+		ValidChoices: choices,
+		Item:         g.PendingCardItem,
+		ValidStacks:  result.ValidStacks,
+	}
 }
 
 // ProvideInput provides the player's input and continues game execution.
@@ -177,14 +178,11 @@ func (g *GameState) provideDayInput(choice int) *PlayerInputNeeded {
 
 	case DaySubStagePlay1:
 		g.PendingCardItem = player.Hand[choice-1].FarmItemType
-		err := player.Farm.PlayCard(g.PendingCardItem, player.PlayChoices)
-		if err != nil {
-			if _, ok := err.(*PlayerInputNeeded); ok {
-				// Need stack selection
-				g.DaySubStage = DaySubStagePlay1Stack
-				return g.DoPlayerDayTurn()
-			}
-			// Other error - should not happen in normal gameplay
+		result := player.Farm.PlayCard(g.PendingCardItem, player.PlayChoices)
+		if result != nil {
+			// Need stack selection
+			g.DaySubStage = DaySubStagePlay1Stack
+			return g.DoPlayerDayTurn()
 		}
 		// Card played successfully
 		player.Hand[choice-1] = HandItem{FarmItemType: NUM_FARM_ITEMS}
@@ -213,13 +211,11 @@ func (g *GameState) provideDayInput(choice int) *PlayerInputNeeded {
 
 	case DaySubStagePlay2:
 		g.PendingCardItem = player.Hand[choice-1].FarmItemType
-		err := player.Farm.PlayCard(g.PendingCardItem, player.PlayChoices)
-		if err != nil {
-			if _, ok := err.(*PlayerInputNeeded); ok {
-				// Need stack selection
-				g.DaySubStage = DaySubStagePlay2Stack
-				return g.DoPlayerDayTurn()
-			}
+		result := player.Farm.PlayCard(g.PendingCardItem, player.PlayChoices)
+		if result != nil {
+			// Need stack selection
+			g.DaySubStage = DaySubStagePlay2Stack
+			return g.DoPlayerDayTurn()
 		}
 		// Card played successfully
 		player.Hand[choice-1] = HandItem{FarmItemType: NUM_FARM_ITEMS}
@@ -228,11 +224,9 @@ func (g *GameState) provideDayInput(choice int) *PlayerInputNeeded {
 		return g.DoPlayerDayTurn()
 
 	case DaySubStagePlay2Stack:
-		if choice == 0 {
-			// New stack
+		if choice == 0 { // New stack
 			player.Farm.makeStackWith(g.PendingCardItem)
-		} else {
-			// Add to existing stack
+		} else { // Add to existing stack
 			player.Farm.addToStackIndex(g.PendingCardItem, choice-1)
 		}
 		// Find and blank the played card from hand
@@ -484,10 +478,7 @@ func (g *GameState) processZombieCard(nightCard NightCard) *PlayerInputNeeded {
 	freeStacks := player.Farm.FindStacksThatCanKillForFree(zc)
 	if len(freeStacks) > 0 {
 		player.Farm.UseDefenseStack(freeStacks[0], zc, false, g)
-		g.DiscardNightCard(nightCard)
-		if len(player.Farm.NightCards) > 0 {
-			player.Farm.NightCards = player.Farm.NightCards[1:]
-		}
+		// Don't remove night card yet - keep it visible for confirmation display
 		g.NightSubStage = NightSubStageZombieAutoKilled
 		return g.processNightCards()
 	}
@@ -532,6 +523,13 @@ func (g *GameState) provideNightInput(choice int) *PlayerInputNeeded {
 
 	switch g.NightSubStage {
 	case NightSubStageZombieAutoKilled:
+		// Now remove the night card after confirmation
+		if g.CurrentNightCard != nil {
+			g.DiscardNightCard(*g.CurrentNightCard)
+		}
+		if len(player.Farm.NightCards) > 0 {
+			player.Farm.NightCards = player.Farm.NightCards[1:]
+		}
 		// Continue to next player
 		g.NightPlayerIndex++
 		if len(g.Players) > 0 {
