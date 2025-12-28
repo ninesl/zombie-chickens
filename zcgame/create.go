@@ -1,0 +1,135 @@
+package zcgame
+
+import "fmt"
+
+// random order based on DayCards global variable configs
+func CreateDayDeck() Stack {
+	var deck = Stack{}
+	for farmItem, amount := range DayCardAmounts {
+		for range amount {
+			deck = append(deck, farmItem)
+		}
+	}
+
+	Shuffle(deck)
+
+	return deck
+}
+
+func CreateNightDeck() []NightCard {
+	var deck = make([]NightCard, 0)
+	for zKey, zombie := range ZombieChickens {
+		for range zombie.NumInDeck {
+			deck = append(deck, NightCard{
+				ZombieKey: zKey,
+			})
+		}
+	}
+
+	for _, event := range NightCardEvents {
+		deck = append(deck, NightCard{
+			Event:     event,
+			ZombieKey: -1,
+		})
+	}
+
+	Shuffle(deck)
+
+	return deck
+}
+
+var (
+	StartingLivesLookup = map[int]int{
+		1: 5,
+		2: 5,
+		3: 4,
+		4: 4,
+	}
+)
+
+func (g *GameState) DealPublicDayCards() {
+	g.PublicDayCards = [2]FarmItemType{g.NextDayCard(), g.NextDayCard()}
+}
+
+func CreateNewGame(playerNames ...string) (*GameState, error) {
+	if len(playerNames) == 0 {
+		return nil, fmt.Errorf("must provide at least 1 player")
+	} else if len(playerNames) > 4 {
+		return nil, fmt.Errorf("must provide max 4 player names")
+	}
+
+	var g = &GameState{
+		DayDeck:             CreateDayDeck(),
+		NightDeck:           CreateNightDeck(),
+		Turn:                Morning,
+		StageInTurn:         OptionalDiscard,
+		CurrentPlayerIdx:    0, //redundant
+		NightNum:            1,
+		DiscardedDayCards:   make(map[FarmItemType]int),
+		DiscardedNightCards: NightCards{},
+	}
+
+	g.DealPublicDayCards()
+	g.Players = make([]*Player, 0, len(playerNames))
+	for i, name := range playerNames {
+		g.Players = append(g.Players, createPlayer(g, name, len(playerNames), i))
+	}
+	if err := g.assertNewGame(); err != nil {
+		return nil, err
+	}
+
+	return g, nil
+}
+
+// DebugEventsOnTop puts Lightning Storm and Tornado as the first 2 cards,
+// then other events, then zombies.
+func (g *GameState) DebugEventsOnTop() {
+	// Find Lightning Storm and Tornado specifically
+	var lightningStorm, tornado NightCard
+	otherEvents := make([]NightCard, 0)
+	zombies := make([]NightCard, 0)
+
+	for _, card := range g.NightDeck {
+		if card.IsEvent() {
+			if card.Event.Name == "Lightning Storm" {
+				lightningStorm = card
+			} else if card.Event.Name == "Tornado" {
+				tornado = card
+			} else {
+				otherEvents = append(otherEvents, card)
+			}
+		} else {
+			zombies = append(zombies, card)
+		}
+	}
+
+	// Lightning Storm first, Tornado second, then other events, then zombies
+	g.NightDeck = append([]NightCard{lightningStorm, tornado}, otherEvents...)
+	g.NightDeck = append(g.NightDeck, zombies...)
+}
+
+// creates new player with a fresh 5 card hand
+func createPlayer(g *GameState, name string, numPlayers int, playerIdx int) *Player {
+	// Apply color to player name
+	coloredName := PlayerColors[playerIdx%len(PlayerColors)] + name + Reset
+
+	return &Player{
+		Name:  coloredName,
+		Lives: StartingLivesLookup[numPlayers],
+		Farm: &Farm{
+			Stacks:     Stacks{},
+			NightCards: NightCards{},
+		},
+		Hand: Hand{
+			HandItem{FarmItemType: g.NextDayCard()},
+			HandItem{FarmItemType: g.NextDayCard()},
+			HandItem{FarmItemType: g.NextDayCard()},
+			HandItem{FarmItemType: g.NextDayCard()},
+			HandItem{FarmItemType: g.NextDayCard()},
+		},
+		PlayChoices: PlayerPlayChoices{
+			AutoloadShotgun:  true,
+			AutoBuildHayWall: true,
+		},
+	}
+}

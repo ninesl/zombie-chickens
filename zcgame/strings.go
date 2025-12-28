@@ -1,0 +1,447 @@
+package zcgame
+
+import (
+	"fmt"
+	"log"
+	"os"
+	"os/exec"
+	"runtime"
+	"sort"
+)
+
+// ANSI escape codes
+const (
+	Reset        = "\033[0m"
+	Bold         = "\033[1m"
+	Italic       = "\033[3m"
+	Red          = "\033[31m"
+	Green        = "\033[32m"
+	Yellow       = "\033[33m"
+	Blue         = "\033[34m"
+	Purple       = "\033[35m"
+	Orange       = "\033[38;5;208m"
+	BrightGreen  = "\033[92m"
+	BrightBlue   = "\033[94m"
+	BrightPurple = "\033[95m"
+	BrightGrey   = "\033[38;5;105m"
+)
+
+// RedStar for one-time-use items
+const RedStar = Red + "*" + Reset
+
+// PlayerColors for players 1-4
+var PlayerColors = []string{Green, Yellow, BrightPurple, BrightBlue}
+
+func (f FarmItemType) String() string {
+	switch f {
+	case HayBale:
+		return BrightGrey + Italic + "Hay Bale" + Reset
+	case Scarecrow:
+		return BrightGrey + Italic + "Scarecrow" + Reset
+	case Shotgun:
+		return BrightGrey + Italic + "Shotgun" + Reset
+	case Ammo:
+		return BrightGrey + Italic + "Ammo" + Reset + RedStar
+	case BoobyTrap:
+		return BrightGrey + Italic + "Booby Trap" + Reset + RedStar
+	case Shield:
+		return BrightGrey + Italic + "Shield" + Reset + RedStar
+	case Flamethrower:
+		return BrightGrey + Italic + "Flamethrower" + Reset
+	case Fuel:
+		return BrightGrey + Italic + "Fuel" + Reset
+	case WOLR:
+		return BrightGrey + Italic + "W.O.L.R" + Reset + RedStar
+	default:
+		return fmt.Sprintf("FarmItemType ERROR %d", int(f))
+	}
+}
+
+func (t Turn) String() string {
+	switch t {
+	case Morning:
+		return BrightBlue + Italic + "Morning" + Reset
+	case Afternoon:
+		return Orange + Italic + "Afternoon" + Reset
+	case Night:
+		return BrightPurple + Italic + "Night" + Reset
+	case Day:
+		return Italic + "Day" + Reset
+	default:
+		return fmt.Sprintf("Turn ERROR %d", int(t))
+	}
+}
+
+func (zt ZombieTrait) String() string {
+	switch zt {
+	case Invisible:
+		return Purple + "Invisible" + Reset
+	case Flying:
+		return BrightBlue + "Flying" + Reset
+	case Climbing:
+		return Yellow + "Climbing" + Reset
+	case Bulletproof:
+		return Blue + "Bulletproof" + Reset
+	case Fireproof:
+		return Red + "Fireproof" + Reset
+	case Timid:
+		return BrightGreen + "Timid" + Reset
+	case Exploding:
+		return Orange + "Exploding" + Reset
+	default:
+		return fmt.Sprintf("ZombieTrait ERROR %d", int(zt))
+	}
+}
+
+func IntSliceChoices(s ...int) string {
+	return fmt.Sprintf("%+v", s)
+}
+
+func (s StageInTurn) String() string {
+	switch s {
+	case OptionalDiscard:
+		return Bold + Italic + "Discard a card to draw a card from the deck (optional)" + Reset
+	case Play2Cards:
+		return Bold + Italic + "Play 2 cards to your farm" + Reset
+	case Draw2Cards:
+		return Bold + Italic + "Draw 2 cards from the deck or the 2 face-up cards" + Reset
+	case Nighttime:
+		return Bold + Italic + "Progress through the night..." + Reset
+	default:
+		return fmt.Sprintf("StageInTurn ERROR %d", int(s))
+	}
+}
+
+func (g *GameState) String() string {
+	result := fmt.Sprintf("%s %d\n%s\n---\n", g.Turn, g.NightNum, g.PublicDayCards)
+	for i, player := range g.Players {
+		isCurrentPlayer := i == g.CurrentPlayerIdx
+		result += player.StringWithVisibility(isCurrentPlayer)
+		if i < len(g.Players)-1 {
+			result += "\n---\n"
+		}
+	}
+	result += fmt.Sprintf("\n---\n%s\n", g.StageInTurn)
+	return result
+}
+
+func (p Players) String() string {
+	result := ""
+	for i, player := range p {
+		result += fmt.Sprintf("%s", player)
+		if i < len(p)-1 {
+			result += "\n---\n"
+		}
+	}
+	return result
+}
+
+func (p *Player) String() string {
+	return p.StringWithVisibility(true)
+}
+
+func (p *Player) StringWithVisibility(isCurrentPlayer bool) string {
+	nightCardsStr := p.Farm.NightCards.StringWithVisibility(isCurrentPlayer)
+	return fmt.Sprintf("%s : %dhp\n%s\n%s\n%s", p.Name, p.Lives, nightCardsStr, p.Farm, p.Hand.String())
+}
+
+// returns the first night card in a nicely formatted way
+func (n NightCards) String() string {
+	return n.StringWithVisibility(true)
+}
+
+func (n NightCards) StringWithVisibility(isCurrentPlayer bool) string {
+	if len(n) == 0 {
+		return ""
+	}
+
+	if !isCurrentPlayer {
+		return fmt.Sprintf("%d Night Cards", len(n))
+	}
+
+	card := n[0]
+
+	if card.IsZombie() {
+		return fmt.Sprintf("%s", ZombieChickens[card.ZombieKey])
+	} else if card.IsEvent() {
+		return fmt.Sprintf("%s", card.Event)
+	}
+
+	log.Fatal("this should not happen")
+	return ""
+}
+
+func (e Event) String() string {
+	return Bold + e.Name + Reset + "\n| " + Italic + e.Description + Reset + " |"
+}
+
+func (zt ZombieTraits) String() string {
+	if len(zt) == 0 {
+		log.Fatal("a zombie should always have traits")
+	}
+
+	// Sort by ZombieTrait value
+	sort.Slice(zt, func(i, j int) bool {
+		return zt[i] < zt[j]
+	})
+
+	result := "|"
+	for _, trait := range zt {
+		result += fmt.Sprintf(" %s |", trait)
+	}
+	return result
+}
+
+func (z ZombieChicken) String() string {
+	return fmt.Sprintf("%s%s%s\n%s", Bold, z.Name, Reset, z.Traits)
+}
+
+func (s Stacks) String() string {
+	return s.stringWithIndices(false)
+}
+
+// StringForDiscard returns a string representation with item indices for discarding.
+func (s Stacks) StringForDiscard() string {
+	return s.stringWithIndices(true)
+}
+
+// StringForNight returns a string representation with stack indices (1-based, not sorted).
+func (s Stacks) StringForNight() string {
+	result := ""
+	for i, stack := range s {
+		result += fmt.Sprintf("%d:%s", i+1, stack)
+		if i < len(s)-1 {
+			result += "\n"
+		}
+	}
+	return result
+}
+
+func (s Stacks) stringWithIndices(showIndices bool) string {
+	// Sort each inner stack by FarmItemType
+	for i := range s {
+		sort.Slice(s[i], func(a, b int) bool {
+			return s[i][a] < s[i][b]
+		})
+	}
+
+	// Sort stacks by first element
+	sort.Slice(s, func(i, j int) bool {
+		if len(s[i]) == 0 {
+			return false
+		}
+		if len(s[j]) == 0 {
+			return true
+		}
+		return s[i][0] < s[j][0]
+	})
+
+	result := ""
+	idx := 1
+	for i, stack := range s {
+		if showIndices {
+			result += stack.stringWithIndices(&idx)
+		} else {
+			result += fmt.Sprintf("%s", stack)
+		}
+		if i < len(s)-1 {
+			// avoids trailing whitespace
+			result += "\n"
+		}
+	}
+	return result
+}
+
+// TotalItems returns the total number of items across all stacks.
+func (s Stacks) TotalItems() int {
+	count := 0
+	for _, stack := range s {
+		count += len(stack)
+	}
+	return count
+}
+
+func (f *Farm) String() string {
+	return fmt.Sprintf("Farm:\n%s", f.Stacks)
+}
+
+func (f *Farm) StringForDiscard() string {
+	return fmt.Sprintf("Farm:\n%s", f.Stacks.StringForDiscard())
+}
+
+func (f *Farm) StringForNight() string {
+	return fmt.Sprintf("Farm:\n%s", f.Stacks.StringForNight())
+}
+
+func (h HandItem) String() string {
+	if h.FarmItemType == NUM_FARM_ITEMS {
+		return ""
+	}
+	return fmt.Sprintf("%s", h.FarmItemType)
+}
+
+func (h *Hand) String() string {
+	return h.stringWithIndices(true)
+}
+
+func (h *Hand) StringWithoutIndices() string {
+	return h.stringWithIndices(false)
+}
+
+func (h *Hand) stringWithIndices(showIndices bool) string {
+	h.Sort()
+
+	result := "Hand: { "
+	first := true
+	idx := 1
+	for _, card := range h {
+		if card.FarmItemType == NUM_FARM_ITEMS {
+			continue // skip blank slots
+		}
+		if !first {
+			result += ", "
+		}
+		if showIndices {
+			result += fmt.Sprintf("%d:%s", idx, card)
+		} else {
+			result += fmt.Sprintf("%s", card)
+		}
+		idx++
+		first = false
+	}
+	result += " }"
+
+	return result
+}
+
+// Sort sorts the hand in-place by visible (true first), then by FarmItemType
+func (h *Hand) Sort() {
+	sort.Slice(h[:], func(i, j int) bool {
+		if h[i].Visible != h[j].Visible {
+			return h[i].Visible // true comes before false
+		}
+		return h[i].FarmItemType < h[j].FarmItemType
+	})
+}
+
+func (s Stack) String() string {
+	// Sort by FarmItemType
+	sort.Slice(s, func(i, j int) bool {
+		return s[i] < s[j]
+	})
+
+	result := "{ "
+	for i, item := range s {
+		result += fmt.Sprintf("%s", item)
+		if i < len(s)-1 {
+			result += ", "
+		}
+	}
+	result += " }"
+	return result
+}
+
+func (s Stack) stringWithIndices(idx *int) string {
+	// Sort by FarmItemType
+	sort.Slice(s, func(i, j int) bool {
+		return s[i] < s[j]
+	})
+
+	result := "{ "
+	for i, item := range s {
+		result += fmt.Sprintf("%d: %s", *idx, item)
+		*idx++
+		if i < len(s)-1 {
+			result += ", "
+		}
+	}
+	result += " }"
+	return result
+}
+
+// ClearScreen clears the terminal screen
+func ClearScreen() {
+	var cmd *exec.Cmd
+
+	switch runtime.GOOS {
+	case "linux", "darwin":
+		cmd = exec.Command("clear")
+	case "windows":
+		cmd = exec.Command("cmd", "/c", "cls")
+	default:
+		// Fallback: print ANSI escape code
+		fmt.Print("\033[H\033[2J")
+		return
+	}
+
+	cmd.Stdout = os.Stdout
+	cmd.Run()
+}
+
+func (g *GameState) StatsString() string {
+	zombiesKilled := 0
+	eventsPlayed := 0
+	for _, card := range g.DiscardedNightCards {
+		if card.IsZombie() {
+			zombiesKilled++
+		} else if card.IsEvent() {
+			eventsPlayed++
+		}
+	}
+
+	dayCardsDiscarded := 0
+	for _, count := range g.DiscardedDayCards {
+		dayCardsDiscarded += count
+	}
+
+	return fmt.Sprintf("Zombies Killed: %d | Events Played: %d | Day Cards Discarded: %d", zombiesKilled, eventsPlayed, dayCardsDiscarded)
+}
+
+func RefreshRender(g *GameState) {
+	ClearScreen()
+	fmt.Printf("%s\n", g.StatsString())
+	fmt.Printf("%s", g)
+	if len(g.Players) > 0 {
+		fmt.Printf("%s's %s\n", g.CurrentPlayer().Name, g.Turn)
+	}
+}
+
+// RefreshRenderForDiscard renders the game state with farm item indices shown and hand indices hidden.
+// Used during Lightning Storm and Tornado events.
+func RefreshRenderForDiscard(g *GameState) {
+	ClearScreen()
+	fmt.Printf("%s\n", g.StatsString())
+	fmt.Printf("%s %d\n%s\n---\n", g.Turn, g.NightNum, g.PublicDayCards)
+	for i, player := range g.Players {
+		isCurrentPlayer := i == g.CurrentPlayerIdx
+		nightCardsStr := player.Farm.NightCards.StringWithVisibility(isCurrentPlayer)
+		fmt.Printf("%s : %dhp\n%s\n%s\n%s", player.Name, player.Lives, nightCardsStr, player.Farm.StringForDiscard(), player.Hand.StringWithoutIndices())
+		if i < len(g.Players)-1 {
+			fmt.Printf("\n---\n")
+		}
+	}
+	fmt.Printf("\n---\n%s\n", g.StageInTurn)
+	if len(g.Players) > 0 {
+		fmt.Printf("%s's %s\n", g.CurrentPlayer().Name, g.Turn)
+	}
+}
+
+// RefreshRenderForNight renders the game state with farm stack indices shown and hand indices hidden.
+// Used during zombie attacks at night.
+func RefreshRenderForNight(g *GameState) {
+	ClearScreen()
+	fmt.Printf("%s\n", g.StatsString())
+	fmt.Printf("%s %d\n%s\n---\n", g.Turn, g.NightNum, g.PublicDayCards)
+	for i, player := range g.Players {
+		isCurrentPlayer := i == g.CurrentPlayerIdx
+		nightCardsStr := player.Farm.NightCards.StringWithVisibility(isCurrentPlayer)
+		fmt.Printf("%s : %dhp\n%s\n%s\n%s", player.Name, player.Lives, nightCardsStr, player.Farm.StringForNight(), player.Hand.StringWithoutIndices())
+		if i < len(g.Players)-1 {
+			fmt.Printf("\n---\n")
+		}
+	}
+	fmt.Printf("\n---\n%s\n", g.StageInTurn)
+	if len(g.Players) > 0 {
+		fmt.Printf("%s's %s\n", g.CurrentPlayer().Name, g.Turn)
+	}
+}
