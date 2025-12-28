@@ -77,8 +77,14 @@ func (g *GameState) GatherPlayerInputForNight(msg string, choices ...int) int {
 	return g.gatherPlayerInputWithRender(RefreshRenderForNight, msg, choices...)
 }
 
+func (g *GameState) GatherPlayerInputNoRefresh(msg string, choices ...int) int {
+	return g.gatherPlayerInputWithRender(nil, msg, choices...)
+}
+
 func (g *GameState) gatherPlayerInputWithRender(renderFunc func(*GameState), msg string, choices ...int) int {
-	renderFunc(g)
+	if renderFunc != nil {
+		renderFunc(g)
+	}
 	fmt.Printf("%s: ", msg)
 
 	scanner := bufio.NewScanner(os.Stdin)
@@ -181,7 +187,7 @@ func (g *GameState) DoNightTurn() {
 					nightCard.Event.Action(g)
 					// Skip confirmation for events that already gather input
 					if nightCard.Event.Name != "Lightning Storm" && nightCard.Event.Name != "Tornado" {
-						g.GatherPlayerInput("press 0 to continue", 0)
+						g.GatherPlayerInputNoRefresh("press 0 to continue", 0)
 					}
 					g.DiscardNightCard(nightCard)
 					// Remove the processed event card (if not already cleared by event like Silent Night)
