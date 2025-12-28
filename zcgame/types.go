@@ -60,6 +60,33 @@ func (p PublicDayCards) String() string {
 	return fmt.Sprintf("%s", Stack(p[:]))
 }
 
+// DaySubStage tracks sub-stages within the day turn for resumption
+type DaySubStage uint8
+
+const (
+	DaySubStageOptionalDiscard DaySubStage = iota
+	DaySubStagePlay1
+	DaySubStagePlay1Stack // Waiting for stack selection after PlayCard returns NeedsPlayerInput
+	DaySubStagePlay2
+	DaySubStagePlay2Stack // Waiting for stack selection after PlayCard returns NeedsPlayerInput
+	DaySubStageDraw
+)
+
+// NightSubStage tracks sub-stages within the night turn for resumption
+type NightSubStage uint8
+
+const (
+	NightSubStageProcessCards     NightSubStage = iota
+	NightSubStageZombieAutoKilled               // Waiting for confirmation after auto-kill
+	NightSubStageNoDefense                      // Waiting for confirmation when no defense
+	NightSubStageEliminated                     // Waiting for confirmation after elimination
+	NightSubStageChooseDefense                  // Waiting for player to choose defense stack
+	NightSubStageChooseShield                   // Waiting for shield decision
+	NightSubStageConfirmLifeLoss                // Waiting for confirmation after choosing -1
+	NightSubStageEventConfirm                   // Waiting for event confirmation
+	NightSubStageEventDiscard                   // Waiting for event discard selection
+)
+
 type GameState struct {
 	Players             Players
 	CurrentPlayerIdx    int
@@ -71,6 +98,32 @@ type GameState struct {
 	NightDeck           NightCards
 	DiscardedNightCards NightCards
 	NightNum            int
+
+	// State tracking for resumption after player input
+	DaySubStage        DaySubStage
+	NightSubStage      NightSubStage
+	PendingCardItem    FarmItemType // Card being played that needs stack selection
+	PendingStackChoice int          // Stack index chosen for card placement
+	PlayerTurnIndex    int          // Tracks which player's turn during day loop (0 to len(Players)-1)
+
+	// Night state tracking
+	NightCardsDealt       bool           // Whether night cards have been dealt this night
+	NightPlayerIndex      int            // Index in current night round
+	NightPlayersToProcess int            // Number of players to process in current round
+	NightAnyCardProcessed bool           // Whether any card was processed this round
+	CurrentNightCard      *NightCard     // Current night card being processed
+	CurrentZombie         *ZombieChicken // Current zombie being fought
+	ChosenStackIdx        int            // Stack chosen for defense
+
+	// Event discard state
+	EventDiscardStartIdx  int // Starting player index (current player when event triggered)
+	EventDiscardPlayerIdx int // Which player is discarding (offset from start, 0 to len(Players)-1)
+	EventDiscardRemaining int // How many more cards to discard for current player
+	EventDiscardTotal     int // Total cards to discard per player (for display)
+
+	// Pending event confirmation (saved before action runs so it's not overwritten)
+	PendingEventName string
+	PendingEventDesc string
 }
 
 type ZombieTrait uint8
@@ -95,7 +148,7 @@ type ZombieChicken struct {
 }
 
 type Event struct {
-	Action            func(*GameState)
+	Action            func(*GameState) *PlayerInputNeeded
 	Name, Description string
 }
 
@@ -106,87 +159,94 @@ var (
 		{
 			Name:        "Lightning Storm",
 			Description: "All players discards 2 cards from their farm.",
-			Action: func(g *GameState) {
-				g.discardCardsFromAllFarms(2)
+			Action: func(g *GameState) *PlayerInputNeeded {
+				return g.startEventDiscard(2)
 			},
 		},
 		{
 			Name:        "Tornado",
 			Description: "All players discard 3 cards from their farm.",
-			Action: func(g *GameState) {
-				g.discardCardsFromAllFarms(3)
+			Action: func(g *GameState) *PlayerInputNeeded {
+				return g.startEventDiscard(3)
 			},
 		},
 		{
 			Name:        "Blood Moon",
 			Description: "Zombies are flocking tonight!\nAll players draw 3 more Night cards.",
-			Action: func(g *GameState) {
-				for _, player := range g.Players {
+			Action: func(g *GameState) *PlayerInputNeeded {
+				for i := range g.Players {
+					idx := (g.CurrentPlayerIdx + i) % len(g.Players)
 					for range 3 {
-						player.Farm.NightCards = append(player.Farm.NightCards, g.NextNightCard())
+						g.Players[idx].Farm.NightCards = append(g.Players[idx].Farm.NightCards, g.NextNightCard())
 					}
 				}
+				return nil
 			},
 		},
 		{
 			Name:        "Winter Solstice",
 			Description: "It's gonna be a long night! All players draw 2 more Night cards.",
-			Action: func(g *GameState) {
-				for _, player := range g.Players {
-					player.Farm.NightCards = append(player.Farm.NightCards, g.NextNightCard())
-					player.Farm.NightCards = append(player.Farm.NightCards, g.NextNightCard())
+			Action: func(g *GameState) *PlayerInputNeeded {
+				for i := range g.Players {
+					idx := (g.CurrentPlayerIdx + i) % len(g.Players)
+					g.Players[idx].Farm.NightCards = append(g.Players[idx].Farm.NightCards, g.NextNightCard())
+					g.Players[idx].Farm.NightCards = append(g.Players[idx].Farm.NightCards, g.NextNightCard())
 				}
+				return nil
 			},
 		},
 		{
 			Name:        "Squirrel Stampede",
 			Description: "A squirrel stampede triggers all Booby Traps! All players discard any Booby Traps on their farm.",
-			Action: func(g *GameState) {
+			Action: func(g *GameState) *PlayerInputNeeded {
 				for i := range g.Players {
-					if g.Players[i].Farm.HasItemInStacks(BoobyTrap) {
-						for j := range g.Players[i].Farm.Stacks {
-							if g.Players[i].Farm.Stacks[j].HasItem(BoobyTrap) {
-								g.Players[i].Farm.Stacks[j].RemoveItem(BoobyTrap)
+					idx := (g.CurrentPlayerIdx + i) % len(g.Players)
+					if g.Players[idx].Farm.HasItemInStacks(BoobyTrap) {
+						for j := range g.Players[idx].Farm.Stacks {
+							if g.Players[idx].Farm.Stacks[j].HasItem(BoobyTrap) {
+								g.Players[idx].Farm.Stacks[j].RemoveItem(BoobyTrap)
 								g.DiscardDayCard(BoobyTrap)
 							}
 						}
 					}
-
-					g.Players[i].Farm.clearStacks()
+					g.Players[idx].Farm.clearStacks()
 				}
+				return nil
 			},
 		},
 		{
 			Name:        "Heavy Rainfall",
 			Description: "Water rusts Flamethrowers! All players discard any Flamethrowers and Fuel on their farm.",
-			Action: func(g *GameState) {
+			Action: func(g *GameState) *PlayerInputNeeded {
 				for i := range g.Players {
-					for j := range g.Players[i].Farm.Stacks {
-						if g.Players[i].Farm.Stacks[j].HasItem(Flamethrower) {
-							g.Players[i].Farm.Stacks[j].RemoveItem(Flamethrower)
+					idx := (g.CurrentPlayerIdx + i) % len(g.Players)
+					for j := range g.Players[idx].Farm.Stacks {
+						if g.Players[idx].Farm.Stacks[j].HasItem(Flamethrower) {
+							g.Players[idx].Farm.Stacks[j].RemoveItem(Flamethrower)
 							g.DiscardDayCard(Flamethrower)
 						}
-						if g.Players[i].Farm.Stacks[j].HasItem(Fuel) {
-							g.Players[i].Farm.Stacks[j].RemoveItem(Fuel)
+						if g.Players[idx].Farm.Stacks[j].HasItem(Fuel) {
+							g.Players[idx].Farm.Stacks[j].RemoveItem(Fuel)
 							g.DiscardDayCard(Fuel)
 						}
 					}
-
-					g.Players[i].Farm.clearStacks()
+					g.Players[idx].Farm.clearStacks()
 				}
+				return nil
 			},
 		},
 		{
 			Name:        "Silent Night",
 			Description: "No more zombies tonight! All players discard any remaining Night cards.",
-			Action: func(g *GameState) {
-				for _, player := range g.Players {
-					for _, card := range player.Farm.NightCards {
+			Action: func(g *GameState) *PlayerInputNeeded {
+				for i := range g.Players {
+					idx := (g.CurrentPlayerIdx + i) % len(g.Players)
+					for _, card := range g.Players[idx].Farm.NightCards {
 						g.DiscardNightCard(card)
 					}
-					player.Farm.NightCards = player.Farm.NightCards[:0] // clear
-
+					g.Players[idx].Farm.NightCards = g.Players[idx].Farm.NightCards[:0] // clear
 				}
+				return nil
 			},
 		},
 	}
