@@ -277,11 +277,20 @@ func (g *GameState) handleZombieAttack(player *Player, zc ZombieChicken) bool {
 	// Convert back to 0-based for internal use
 	stackIdx := input - 1
 
+	stackUsed := player.Farm.Stacks[stackIdx]
+	skipShieldPrompt := false
+	for _, item := range stackUsed {
+		if item.IsOneTimeUse() {
+			skipShieldPrompt = true
+			break
+		}
+	}
+
 	// Check if exploding and player has shield
 	useShield := false
-	if zc.Traits.HasTrait(Exploding) && player.Farm.HasItemInStacks(Shield) {
+	if !skipShieldPrompt && zc.Traits.HasTrait(Exploding) && player.Farm.HasItemInStacks(Shield) {
 		msg := fmt.Sprintf("%s: use shield to save stack from exploding zombie? (1=yes, 0=no)", player.Name)
-		useShield = g.GatherPlayerInputForNight(msg, 0, 1) == 1
+		useShield = g.GatherPlayerInputForNight(msg, 1, 0) == 1
 	}
 
 	player.Farm.UseDefenseStack(stackIdx, zc, useShield, g)
