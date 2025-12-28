@@ -237,15 +237,50 @@ func (f *Farm) makeStackWith(item FarmItemType) {
 
 var ErrNeedsPlayerInput = errors.New("needs player input")
 
-type NeedsPlayerInputError struct {
-	Item        FarmItemType
-	ValidStacks []int  // indices of valid stacks player can choose from
-	Message     string // human-readable description
+// InputContext specifies what type of input is being requested
+type InputContext uint8
+
+const (
+	InputContextPlayCard     InputContext = iota // Choosing where to play a card (stack selection)
+	InputContextDiscard                          // Optional discard phase
+	InputContextPlay                             // Play card from hand phase
+	InputContextDraw                             // Draw cards phase (public vs deck)
+	InputContextDefense                          // Night: choose defense stack
+	InputContextShield                           // Night: use shield for exploding zombie?
+	InputContextConfirm                          // Press 0 to continue
+	InputContextEventDiscard                     // Discard cards during event (Lightning Storm, Tornado)
+)
+
+// RenderType specifies which render function to use
+type RenderType uint8
+
+const (
+	RenderNormal RenderType = iota
+	RenderForDiscard
+	RenderForNight
+	RenderNone
+)
+
+// PlayerInputNeeded is returned when the game needs player input to continue.
+// In CLI mode, this triggers input gathering from stdin.
+// In API mode, this should be returned to the caller to request input.
+type PlayerInputNeeded struct {
+	Context      InputContext
+	RenderType   RenderType
+	Message      string // human-readable prompt
+	ValidChoices []int  // valid input values
+
+	// Optional context for specific input types
+	Item        FarmItemType // for InputContextPlayCard - which item needs placement
+	ValidStacks []int        // for InputContextPlayCard/InputContextDefense - valid stack indices
 }
 
-func (e *NeedsPlayerInputError) Error() string {
+func (e *PlayerInputNeeded) Error() string {
 	return "needs player input: " + e.Message
 }
+
+// Legacy type alias for backwards compatibility with PlayCard
+type NeedsPlayerInputError = PlayerInputNeeded
 
 // Adds item to specific f.Stacks[index]. Does not do any checking, allows illegal Stacks
 func (f *Farm) addToStackIndex(item FarmItemType, stackIndex int) error {
