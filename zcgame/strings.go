@@ -116,7 +116,7 @@ func (g *GameState) String() string {
 	result := fmt.Sprintf("%s %d\n%s\n---\n", g.Turn, g.NightNum, g.PublicDayCards)
 	for i, player := range g.Players {
 		isCurrentPlayer := i == g.CurrentPlayerIdx
-		result += player.StringWithVisibility(isCurrentPlayer)
+		result += player.StringWithVisibility(isCurrentPlayer, g.Turn)
 		if i < len(g.Players)-1 {
 			result += "\n---\n"
 		}
@@ -137,34 +137,43 @@ func (p Players) String() string {
 }
 
 func (p *Player) String() string {
-	return p.StringWithVisibility(true)
+	return p.StringWithVisibility(true, Night)
 }
 
-func (p *Player) StringWithVisibility(isCurrentPlayer bool) string {
-	nightCardsStr := p.Farm.NightCards.StringWithVisibility(isCurrentPlayer)
+func (p *Player) StringWithVisibility(isCurrentPlayer bool, turn Turn) string {
+	nightCardsStr := p.Farm.NightCards.StringWithVisibility(isCurrentPlayer, turn)
 	return fmt.Sprintf("%s : %dhp\n%s\n%s\n%s", p.Name, p.Lives, nightCardsStr, p.Farm, p.Hand.String())
 }
 
 // returns the first night card in a nicely formatted way
 func (n NightCards) String() string {
-	return n.StringWithVisibility(true)
+	return n.StringWithVisibility(true, Night)
 }
 
-func (n NightCards) StringWithVisibility(isCurrentPlayer bool) string {
-	if len(n) == 0 {
+func (n NightCards) StringWithVisibility(isCurrentPlayer bool, turn Turn) string {
+	// Only show night cards during Night
+	if turn != Night {
 		return ""
 	}
 
+	// Always show count as "NightCard x N" format
+	countStr := fmt.Sprintf("NightCard x %d", len(n))
+
 	if !isCurrentPlayer {
-		return fmt.Sprintf("%d Night Cards", len(n))
+		return countStr
+	}
+
+	// For current player, show count plus the first card details
+	if len(n) == 0 {
+		return countStr
 	}
 
 	card := n[0]
 
 	if card.IsZombie() {
-		return fmt.Sprintf("%s", ZombieChickens[card.ZombieKey])
+		return fmt.Sprintf("%s\n%s", countStr, ZombieChickens[card.ZombieKey])
 	} else if card.IsEvent() {
-		return fmt.Sprintf("%s", card.Event)
+		return fmt.Sprintf("%s\n%s", countStr, card.Event)
 	}
 
 	log.Fatal("this should not happen")
@@ -414,7 +423,7 @@ func RefreshRenderForDiscard(g *GameState) {
 	fmt.Printf("%s %d\n%s\n---\n", g.Turn, g.NightNum, g.PublicDayCards)
 	for i, player := range g.Players {
 		isCurrentPlayer := i == g.CurrentPlayerIdx
-		nightCardsStr := player.Farm.NightCards.StringWithVisibility(isCurrentPlayer)
+		nightCardsStr := player.Farm.NightCards.StringWithVisibility(isCurrentPlayer, g.Turn)
 		fmt.Printf("%s : %dhp\n%s\n%s\n%s", player.Name, player.Lives, nightCardsStr, player.Farm.StringForDiscard(), player.Hand.StringWithoutIndices())
 		if i < len(g.Players)-1 {
 			fmt.Printf("\n---\n")
@@ -434,7 +443,7 @@ func RefreshRenderForNight(g *GameState) {
 	fmt.Printf("%s %d\n%s\n---\n", g.Turn, g.NightNum, g.PublicDayCards)
 	for i, player := range g.Players {
 		isCurrentPlayer := i == g.CurrentPlayerIdx
-		nightCardsStr := player.Farm.NightCards.StringWithVisibility(isCurrentPlayer)
+		nightCardsStr := player.Farm.NightCards.StringWithVisibility(isCurrentPlayer, g.Turn)
 		fmt.Printf("%s : %dhp\n%s\n%s\n%s", player.Name, player.Lives, nightCardsStr, player.Farm.StringForNight(), player.Hand.StringWithoutIndices())
 		if i < len(g.Players)-1 {
 			fmt.Printf("\n---\n")
