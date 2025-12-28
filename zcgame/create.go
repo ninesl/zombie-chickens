@@ -110,11 +110,14 @@ func (g *GameState) DebugEventsOnTop() {
 
 // creates new player with a fresh 5 card hand
 func createPlayer(g *GameState, name string, numPlayers int, playerIdx int) *Player {
-	// Apply color to player name
-	coloredName := PlayerColors[playerIdx%len(PlayerColors)] + name + Reset
+	// Apply color to player name if CLI mode
+	displayName := name
+	if CLIMode {
+		displayName = PlayerColors[playerIdx%len(PlayerColors)] + name + Reset
+	}
 
 	return &Player{
-		Name:  coloredName,
+		Name:  displayName,
 		Lives: StartingLivesLookup[numPlayers],
 		Farm: &Farm{
 			Stacks:     Stacks{},
