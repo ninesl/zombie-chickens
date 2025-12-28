@@ -9,6 +9,9 @@ import (
 	"sort"
 )
 
+// CLIMode controls whether ANSI escape codes are used in String() output
+var CLIMode = fase
+
 // ANSI escape codes
 const (
 	Reset        = "\033[0m"
@@ -26,68 +29,145 @@ const (
 	BrightGrey   = "\033[38;5;105m"
 )
 
-// RedStar for one-time-use items
-const RedStar = Red + "*" + Reset
+// RedStar for one-time-use items (CLI only)
+func redStar() string {
+	if CLIMode {
+		return Red + "*" + Reset
+	}
+	return "*"
+}
 
 // PlayerColors for players 1-4
 var PlayerColors = []string{Green, Yellow, BrightPurple, BrightBlue}
 
+// PlayerColor returns the color for the given player index, or empty string if not CLI mode
+func PlayerColor(idx int) string {
+	if CLIMode {
+		return PlayerColors[idx%len(PlayerColors)]
+	}
+	return ""
+}
+
 func (f FarmItemType) String() string {
+	if CLIMode {
+		switch f {
+		case HayBale:
+			return BrightGrey + Italic + "Hay Bale" + Reset
+		case Scarecrow:
+			return BrightGrey + Italic + "Scarecrow" + Reset
+		case Shotgun:
+			return BrightGrey + Italic + "Shotgun" + Reset
+		case Ammo:
+			return BrightGrey + Italic + "Ammo" + Reset + redStar()
+		case BoobyTrap:
+			return BrightGrey + Italic + "Booby Trap" + Reset + redStar()
+		case Shield:
+			return BrightGrey + Italic + "Shield" + Reset + redStar()
+		case Flamethrower:
+			return BrightGrey + Italic + "Flamethrower" + Reset
+		case Fuel:
+			return BrightGrey + Italic + "Fuel" + Reset
+		case WOLR:
+			return BrightGrey + Italic + "W.O.L.R" + Reset + redStar()
+		default:
+			return fmt.Sprintf("FarmItemType ERROR %d", int(f))
+		}
+	}
+
+	// Non-CLI mode
 	switch f {
 	case HayBale:
-		return BrightGrey + Italic + "Hay Bale" + Reset
+		return "Hay Bale"
 	case Scarecrow:
-		return BrightGrey + Italic + "Scarecrow" + Reset
+		return "Scarecrow"
 	case Shotgun:
-		return BrightGrey + Italic + "Shotgun" + Reset
+		return "Shotgun"
 	case Ammo:
-		return BrightGrey + Italic + "Ammo" + Reset + RedStar
+		return "Ammo*"
 	case BoobyTrap:
-		return BrightGrey + Italic + "Booby Trap" + Reset + RedStar
+		return "Booby Trap*"
 	case Shield:
-		return BrightGrey + Italic + "Shield" + Reset + RedStar
+		return "Shield*"
 	case Flamethrower:
-		return BrightGrey + Italic + "Flamethrower" + Reset
+		return "Flamethrower"
 	case Fuel:
-		return BrightGrey + Italic + "Fuel" + Reset
+		return "Fuel"
 	case WOLR:
-		return BrightGrey + Italic + "W.O.L.R" + Reset + RedStar
+		return "W.O.L.R*"
 	default:
 		return fmt.Sprintf("FarmItemType ERROR %d", int(f))
 	}
 }
 
 func (t Turn) String() string {
+	if CLIMode {
+		switch t {
+		case Morning:
+			return BrightBlue + Italic + "Morning" + Reset
+		case Afternoon:
+			return Orange + Italic + "Afternoon" + Reset
+		case Night:
+			return BrightPurple + Italic + "Night" + Reset
+		case Day:
+			return Italic + "Day" + Reset
+		default:
+			return fmt.Sprintf("Turn ERROR %d", int(t))
+		}
+	}
+
+	// Non-CLI mode
 	switch t {
 	case Morning:
-		return BrightBlue + Italic + "Morning" + Reset
+		return "Morning"
 	case Afternoon:
-		return Orange + Italic + "Afternoon" + Reset
+		return "Afternoon"
 	case Night:
-		return BrightPurple + Italic + "Night" + Reset
+		return "Night"
 	case Day:
-		return Italic + "Day" + Reset
+		return "Day"
 	default:
 		return fmt.Sprintf("Turn ERROR %d", int(t))
 	}
 }
 
 func (zt ZombieTrait) String() string {
+	if CLIMode {
+		switch zt {
+		case Invisible:
+			return Purple + "Invisible" + Reset
+		case Flying:
+			return BrightBlue + "Flying" + Reset
+		case Climbing:
+			return Yellow + "Climbing" + Reset
+		case Bulletproof:
+			return Blue + "Bulletproof" + Reset
+		case Fireproof:
+			return Red + "Fireproof" + Reset
+		case Timid:
+			return BrightGreen + "Timid" + Reset
+		case Exploding:
+			return Orange + "Exploding" + Reset
+		default:
+			return fmt.Sprintf("ZombieTrait ERROR %d", int(zt))
+		}
+	}
+
+	// Non-CLI mode
 	switch zt {
 	case Invisible:
-		return Purple + "Invisible" + Reset
+		return "Invisible"
 	case Flying:
-		return BrightBlue + "Flying" + Reset
+		return "Flying"
 	case Climbing:
-		return Yellow + "Climbing" + Reset
+		return "Climbing"
 	case Bulletproof:
-		return Blue + "Bulletproof" + Reset
+		return "Bulletproof"
 	case Fireproof:
-		return Red + "Fireproof" + Reset
+		return "Fireproof"
 	case Timid:
-		return BrightGreen + "Timid" + Reset
+		return "Timid"
 	case Exploding:
-		return Orange + "Exploding" + Reset
+		return "Exploding"
 	default:
 		return fmt.Sprintf("ZombieTrait ERROR %d", int(zt))
 	}
@@ -98,15 +178,31 @@ func IntSliceChoices(s ...int) string {
 }
 
 func (s StageInTurn) String() string {
+	if CLIMode {
+		switch s {
+		case OptionalDiscard:
+			return Bold + Italic + "Discard a card to draw a card from the deck (optional)" + Reset
+		case Play2Cards:
+			return Bold + Italic + "Play 2 cards to your farm" + Reset
+		case Draw2Cards:
+			return Bold + Italic + "Draw 2 cards from the deck or the 2 face-up cards" + Reset
+		case Nighttime:
+			return Bold + Italic + "Progress through the night..." + Reset
+		default:
+			return fmt.Sprintf("StageInTurn ERROR %d", int(s))
+		}
+	}
+
+	// Non-CLI mode
 	switch s {
 	case OptionalDiscard:
-		return Bold + Italic + "Discard a card to draw a card from the deck (optional)" + Reset
+		return "Discard a card to draw a card from the deck (optional)"
 	case Play2Cards:
-		return Bold + Italic + "Play 2 cards to your farm" + Reset
+		return "Play 2 cards to your farm"
 	case Draw2Cards:
-		return Bold + Italic + "Draw 2 cards from the deck or the 2 face-up cards" + Reset
+		return "Draw 2 cards from the deck or the 2 face-up cards"
 	case Nighttime:
-		return Bold + Italic + "Progress through the night..." + Reset
+		return "Progress through the night..."
 	default:
 		return fmt.Sprintf("StageInTurn ERROR %d", int(s))
 	}
@@ -181,7 +277,10 @@ func (n NightCards) StringWithVisibility(isCurrentPlayer bool, turn Turn) string
 }
 
 func (e Event) String() string {
-	return Bold + e.Name + Reset + "\n| " + Italic + e.Description + Reset + " |"
+	if CLIMode {
+		return Bold + e.Name + Reset + "\n| " + Italic + e.Description + Reset + " |"
+	}
+	return e.Name + "\n| " + e.Description + " |"
 }
 
 func (zt ZombieTraits) String() string {
@@ -202,7 +301,10 @@ func (zt ZombieTraits) String() string {
 }
 
 func (z ZombieChicken) String() string {
-	return fmt.Sprintf("%s%s%s\n%s", Bold, z.Name, Reset, z.Traits)
+	if CLIMode {
+		return fmt.Sprintf("%s%s%s\n%s", Bold, z.Name, Reset, z.Traits)
+	}
+	return fmt.Sprintf("%s\n%s", z.Name, z.Traits)
 }
 
 func (s Stacks) String() string {
