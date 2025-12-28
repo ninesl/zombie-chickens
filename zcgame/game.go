@@ -179,7 +179,10 @@ func (g *GameState) DoNightTurn() {
 				if nightCard.IsEvent() {
 					RefreshRender(g)
 					nightCard.Event.Action(g)
-					g.GatherPlayerInput("press 0 to continue", 0)
+					// Skip confirmation for events that already gather input
+					if nightCard.Event.Name != "Lightning Storm" && nightCard.Event.Name != "Tornado" {
+						g.GatherPlayerInput("press 0 to continue", 0)
+					}
 					g.DiscardNightCard(nightCard)
 					// Remove the processed event card (if not already cleared by event like Silent Night)
 					if len(player.Farm.NightCards) > 0 {
