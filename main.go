@@ -26,11 +26,9 @@ func main() {
 		game.DebugEventsOnTop()
 	}
 
-	for range 7 {
+	for {
 		zcgame.RefreshRender(game)
 		if !game.DoDay() {
-			zcgame.ClearScreen()
-			fmt.Printf("%s\n", game.StatsString())
 			fmt.Println("GAME OVER - All players have been eliminated!")
 			break
 		}
