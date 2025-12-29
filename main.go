@@ -20,6 +20,7 @@ func main() {
 	zcgame.SetCLIMode(true)
 
 	game, err := zcgame.CreateNewGame(names...)
+
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -31,7 +32,7 @@ func main() {
 	// Game loop with input handling
 	for {
 		// Try to advance the game
-		gameOver, inputNeeded := game.ContinueDay()
+		gameContinues, inputNeeded := game.ContinueDay()
 
 		if inputNeeded != nil {
 			// CLI mode: gather input and continue
@@ -43,17 +44,17 @@ func main() {
 
 			// Provide input and continue
 			for {
-				gameOver, inputNeeded = game.ContinueAfterInput(input)
+				gameContinues, inputNeeded = game.ContinueAfterInput(input)
 				if inputNeeded == nil {
 					break
 				}
 				input = zcgame.GatherCLIInput(game, inputNeeded)
 			}
 		}
+		zcgame.RefreshRender(game)
 
-		if gameOver {
+		if gameContinues {
 			// Day completed successfully, show state and continue
-			zcgame.RefreshRender(game)
 			continue
 		}
 

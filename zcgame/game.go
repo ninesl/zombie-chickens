@@ -781,9 +781,9 @@ func (g *GameState) ContinueDay() (bool, *PlayerInputNeeded) {
 }
 
 // ContinueAfterInput resumes game execution after player provides input.
-// Returns (gameOver bool, inputNeeded *PlayerInputNeeded)
-// gameOver is true if the game has ended.
-// inputNeeded is non-nil if more input is required.
+// Returns (true, nil) if the day completed and game continues.
+// Returns (false, nil) if game over.
+// Returns (<bool>, *PlayerInputNeeded) if input is needed.
 func (g *GameState) ContinueAfterInput(choice int) (bool, *PlayerInputNeeded) {
 	inputNeeded := g.provideInput(choice)
 	if inputNeeded != nil {

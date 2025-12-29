@@ -86,6 +86,14 @@ func clearScreen() {
 
 // RefreshRender clears screen and prints game state
 func RefreshRender(g *GameState) {
+
+	for _, p := range g.Players {
+		p.Hand.Sort()
+		for i := range p.Farm.Stacks {
+			p.Farm.Stacks[i].Sort()
+		}
+	}
+
 	clearScreen()
 	fmt.Printf("%s\n", g.StatsString())
 	fmt.Printf("%s", g)
