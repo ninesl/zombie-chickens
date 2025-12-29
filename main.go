@@ -17,6 +17,8 @@ func main() {
 		log.Fatal("usage: go run . [-debug] name1 [name2 ...]")
 	}
 
+	zcgame.SetCLIMode(true)
+
 	game, err := zcgame.CreateNewGame(names...)
 	if err != nil {
 		log.Fatal(err)
@@ -33,7 +35,7 @@ func main() {
 
 		if inputNeeded != nil {
 			// CLI mode: gather input and continue
-			if !zcgame.CLIMode {
+			if !zcgame.IsCLIMode() {
 				log.Fatal("Player input needed but not in CLI mode: ", inputNeeded.Message)
 			}
 

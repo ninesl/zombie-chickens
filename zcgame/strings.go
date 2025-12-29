@@ -3,30 +3,29 @@ package zcgame
 import (
 	"fmt"
 	"log"
-	"sort"
 )
 
 func (f FarmItemType) String() string {
-	if CLIMode {
+	if cliMode {
 		switch f {
 		case HayBale:
-			return BrightGrey + Italic + "Hay Bale" + Reset
+			return brightGrey + italic + "Hay Bale" + reset
 		case Scarecrow:
-			return BrightGrey + Italic + "Scarecrow" + Reset
+			return brightGrey + italic + "Scarecrow" + reset
 		case Shotgun:
-			return BrightGrey + Italic + "Shotgun" + Reset
+			return brightGrey + italic + "Shotgun" + reset
 		case Ammo:
-			return BrightGrey + Italic + "Ammo" + Reset + redStar()
+			return brightGrey + italic + "Ammo" + reset + redStar()
 		case BoobyTrap:
-			return BrightGrey + Italic + "Booby Trap" + Reset + redStar()
+			return brightGrey + italic + "Booby Trap" + reset + redStar()
 		case Shield:
-			return BrightGrey + Italic + "Shield" + Reset + redStar()
+			return brightGrey + italic + "Shield" + reset + redStar()
 		case Flamethrower:
-			return BrightGrey + Italic + "Flamethrower" + Reset
+			return brightGrey + italic + "Flamethrower" + reset
 		case Fuel:
-			return BrightGrey + Italic + "Fuel" + Reset
+			return brightGrey + italic + "Fuel" + reset
 		case WOLR:
-			return BrightGrey + Italic + "W.O.L.R" + Reset + redStar()
+			return brightGrey + italic + "W.O.L.R" + reset + redStar()
 		default:
 			return fmt.Sprintf("FarmItemType ERROR %d", int(f))
 		}
@@ -58,16 +57,16 @@ func (f FarmItemType) String() string {
 }
 
 func (t Turn) String() string {
-	if CLIMode {
+	if cliMode {
 		switch t {
 		case Morning:
-			return BrightBlue + Italic + "Morning" + Reset
+			return brightBlue + italic + "Morning" + reset
 		case Afternoon:
-			return Orange + Italic + "Afternoon" + Reset
+			return orange + italic + "Afternoon" + reset
 		case Night:
-			return BrightPurple + Italic + "Night" + Reset
+			return brightPurple + italic + "Night" + reset
 		case Day:
-			return Italic + "Day" + Reset
+			return italic + "Day" + reset
 		default:
 			return fmt.Sprintf("Turn ERROR %d", int(t))
 		}
@@ -89,22 +88,22 @@ func (t Turn) String() string {
 }
 
 func (zt ZombieTrait) String() string {
-	if CLIMode {
+	if cliMode {
 		switch zt {
 		case Invisible:
-			return Purple + "Invisible" + Reset
+			return purple + "Invisible" + reset
 		case Flying:
-			return BrightBlue + "Flying" + Reset
+			return brightBlue + "Flying" + reset
 		case Climbing:
-			return Yellow + "Climbing" + Reset
+			return yellow + "Climbing" + reset
 		case Bulletproof:
-			return Blue + "Bulletproof" + Reset
+			return blue + "Bulletproof" + reset
 		case Fireproof:
-			return Red + "Fireproof" + Reset
+			return red + "Fireproof" + reset
 		case Timid:
-			return BrightGreen + "Timid" + Reset
+			return brightGreen + "Timid" + reset
 		case Exploding:
-			return Orange + "Exploding" + Reset
+			return orange + "Exploding" + reset
 		default:
 			return fmt.Sprintf("ZombieTrait ERROR %d", int(zt))
 		}
@@ -131,21 +130,21 @@ func (zt ZombieTrait) String() string {
 	}
 }
 
-func IntSliceChoices(s ...int) string {
+func intSliceChoices(s ...int) string {
 	return fmt.Sprintf("%+v", s)
 }
 
 func (s StageInTurn) String() string {
-	if CLIMode {
+	if cliMode {
 		switch s {
 		case OptionalDiscard:
-			return Bold + Italic + "Discard a card to draw a card from the deck (optional)" + Reset
+			return bold + italic + "Discard a card to draw a card from the deck (optional)" + reset
 		case Play2Cards:
-			return Bold + Italic + "Play 2 cards to your farm" + Reset
+			return bold + italic + "Play 2 cards to your farm" + reset
 		case Draw2Cards:
-			return Bold + Italic + "Draw 2 cards from the deck or the 2 face-up cards" + Reset
+			return bold + italic + "Draw 2 cards from the deck or the 2 face-up cards" + reset
 		case Nighttime:
-			return Bold + Italic + "Progress through the night..." + Reset
+			return bold + italic + "Progress through the night..." + reset
 		default:
 			return fmt.Sprintf("StageInTurn ERROR %d", int(s))
 		}
@@ -235,8 +234,8 @@ func (n NightCards) StringWithVisibility(isCurrentPlayer bool, turn Turn) string
 }
 
 func (e Event) String() string {
-	if CLIMode {
-		return Bold + e.Name + Reset + "\n| " + Italic + e.Description + Reset + " |"
+	if cliMode {
+		return bold + e.Name + reset + "\n| " + italic + e.Description + reset + " |"
 	}
 	return e.Name + "\n| " + e.Description + " |"
 }
@@ -246,10 +245,10 @@ func (zt ZombieTraits) String() string {
 		log.Fatal("a zombie should always have traits")
 	}
 
-	// Sort by ZombieTrait value
-	sort.Slice(zt, func(i, j int) bool {
-		return zt[i] < zt[j]
-	})
+	// NOTE: Sorting commented out - order preserved as-is for frontend consistency
+	// sort.Slice(zt, func(i, j int) bool {
+	// 	return zt[i] < zt[j]
+	// })
 
 	result := "|"
 	for _, trait := range zt {
@@ -259,8 +258,8 @@ func (zt ZombieTraits) String() string {
 }
 
 func (z ZombieChicken) String() string {
-	if CLIMode {
-		return fmt.Sprintf("%s%s%s\n%s", Bold, z.Name, Reset, z.Traits)
+	if cliMode {
+		return fmt.Sprintf("%s%s%s\n%s", bold, z.Name, reset, z.Traits)
 	}
 	return fmt.Sprintf("%s\n%s", z.Name, z.Traits)
 }
@@ -287,26 +286,26 @@ func (s Stacks) StringForNight() string {
 }
 
 // stringWithIndices returns a string representation of stacks.
-// NOTE: This sorts the stacks in-place for consistent display ordering.
-// This is acceptable because stack order has no gameplay significance.
+// NOTE: Sorting commented out - order preserved as-is for frontend consistency
 func (s Stacks) stringWithIndices(showIndices bool) string {
+	// NOTE: Sorting commented out - order preserved as-is for frontend consistency
 	// Sort each inner stack by FarmItemType
-	for i := range s {
-		sort.Slice(s[i], func(a, b int) bool {
-			return s[i][a] < s[i][b]
-		})
-	}
+	// for i := range s {
+	// 	sort.Slice(s[i], func(a, b int) bool {
+	// 		return s[i][a] < s[i][b]
+	// 	})
+	// }
 
 	// Sort stacks by first element
-	sort.Slice(s, func(i, j int) bool {
-		if len(s[i]) == 0 {
-			return false
-		}
-		if len(s[j]) == 0 {
-			return true
-		}
-		return s[i][0] < s[j][0]
-	})
+	// sort.Slice(s, func(i, j int) bool {
+	// 	if len(s[i]) == 0 {
+	// 		return false
+	// 	}
+	// 	if len(s[j]) == 0 {
+	// 		return true
+	// 	}
+	// 	return s[i][0] < s[j][0]
+	// })
 
 	result := ""
 	idx := 1
@@ -361,7 +360,9 @@ func (h *Hand) StringWithoutIndices() string {
 }
 
 func (h *Hand) stringWithIndices(showIndices bool) string {
-	h.Sort()
+	// NOTE: Sorting commented out - order preserved as-is for frontend consistency
+	// Hand is sorted explicitly before [3] and [4] assignments in game.go
+	// h.Sort()
 
 	result := "Hand: { "
 	first := true
@@ -387,21 +388,29 @@ func (h *Hand) stringWithIndices(showIndices bool) string {
 }
 
 // Sort sorts the hand in-place by visible (true first), then by FarmItemType.
-// This is called during String() formatting for consistent display.
+// Called explicitly in game.go before accessing [3] and [4] slots.
 func (h *Hand) Sort() {
-	sort.Slice(h[:], func(i, j int) bool {
-		if h[i].Visible != h[j].Visible {
-			return h[i].Visible // true comes before false
+	// Move NUM_FARM_ITEMS (blank slots) to the end, then sort by FarmItemType
+	for i := 0; i < len(h); i++ {
+		for j := i + 1; j < len(h); j++ {
+			// Blank slots go to end
+			if h[i].FarmItemType == NUM_FARM_ITEMS && h[j].FarmItemType != NUM_FARM_ITEMS {
+				h[i], h[j] = h[j], h[i]
+			} else if h[i].FarmItemType != NUM_FARM_ITEMS && h[j].FarmItemType != NUM_FARM_ITEMS {
+				// Both non-blank: sort by FarmItemType
+				if h[i].FarmItemType > h[j].FarmItemType {
+					h[i], h[j] = h[j], h[i]
+				}
+			}
 		}
-		return h[i].FarmItemType < h[j].FarmItemType
-	})
+	}
 }
 
 func (s Stack) String() string {
-	// Sort by FarmItemType
-	sort.Slice(s, func(i, j int) bool {
-		return s[i] < s[j]
-	})
+	// NOTE: Sorting commented out - order preserved as-is for frontend consistency
+	// sort.Slice(s, func(i, j int) bool {
+	// 	return s[i] < s[j]
+	// })
 
 	result := "{ "
 	for i, item := range s {
@@ -415,10 +424,10 @@ func (s Stack) String() string {
 }
 
 func (s Stack) stringWithIndices(idx *int) string {
-	// Sort by FarmItemType
-	sort.Slice(s, func(i, j int) bool {
-		return s[i] < s[j]
-	})
+	// NOTE: Sorting commented out - order preserved as-is for frontend consistency
+	// sort.Slice(s, func(i, j int) bool {
+	// 	return s[i] < s[j]
+	// })
 
 	result := "{ "
 	for i, item := range s {

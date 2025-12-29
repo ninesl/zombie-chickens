@@ -10,49 +10,61 @@ import (
 	"strconv"
 )
 
-// CLIMode controls whether ANSI escape codes are used in String() output.
-// This is set once at startup and should be treated as read-only thereafter.
-// Set to false before creating a game if building an API server instead of CLI.
-var CLIMode = true
+// cliMode controls whether ANSI escape codes are used in String() output.
+// Default is false (API mode). Use SetCLIMode(true) before creating a game for CLI usage.
+var cliMode = false
 
-// ANSI escape codes
+// SetCLIMode sets whether CLI mode is enabled.
+// When true, ANSI escape codes are used for colored output.
+// When false (default), plain text output is used for API/frontend consumption.
+// This should be called once at startup before creating any games.
+func SetCLIMode(enabled bool) {
+	cliMode = enabled
+}
+
+// IsCLIMode returns whether CLI mode is currently enabled.
+func IsCLIMode() bool {
+	return cliMode
+}
+
+// ANSI escape codes (unexported - internal use only)
 const (
-	Reset        = "\033[0m"
-	Bold         = "\033[1m"
-	Italic       = "\033[3m"
-	Red          = "\033[31m"
-	Green        = "\033[32m"
-	Yellow       = "\033[33m"
-	Blue         = "\033[34m"
-	Purple       = "\033[35m"
-	Orange       = "\033[38;5;208m"
-	BrightGreen  = "\033[92m"
-	BrightBlue   = "\033[94m"
-	BrightPurple = "\033[95m"
-	BrightGrey   = "\033[38;5;105m"
+	reset        = "\033[0m"
+	bold         = "\033[1m"
+	italic       = "\033[3m"
+	red          = "\033[31m"
+	green        = "\033[32m"
+	yellow       = "\033[33m"
+	blue         = "\033[34m"
+	purple       = "\033[35m"
+	orange       = "\033[38;5;208m"
+	brightGreen  = "\033[92m"
+	brightBlue   = "\033[94m"
+	brightPurple = "\033[95m"
+	brightGrey   = "\033[38;5;105m"
 )
 
-// RedStar for one-time-use items (CLI only)
+// redStar returns a red asterisk for one-time-use items (CLI only)
 func redStar() string {
-	if CLIMode {
-		return Red + "*" + Reset
+	if cliMode {
+		return red + "*" + reset
 	}
 	return "*"
 }
 
-// PlayerColors for players 1-4
-var PlayerColors = []string{Green, Yellow, BrightPurple, BrightBlue}
+// playerColors for players 1-4
+var playerColors = []string{green, yellow, brightPurple, brightBlue}
 
-// PlayerColor returns the color for the given player index, or empty string if not CLI mode
-func PlayerColor(idx int) string {
-	if CLIMode {
-		return PlayerColors[idx%len(PlayerColors)]
+// playerColor returns the color for the given player index, or empty string if not CLI mode
+func playerColor(idx int) string {
+	if cliMode {
+		return playerColors[idx%len(playerColors)]
 	}
 	return ""
 }
 
-// ClearScreen clears the terminal screen
-func ClearScreen() {
+// clearScreen clears the terminal screen
+func clearScreen() {
 	var cmd *exec.Cmd
 
 	switch runtime.GOOS {
@@ -74,7 +86,7 @@ func ClearScreen() {
 
 // RefreshRender clears screen and prints game state
 func RefreshRender(g *GameState) {
-	ClearScreen()
+	clearScreen()
 	fmt.Printf("%s\n", g.StatsString())
 	fmt.Printf("%s", g)
 	if len(g.Players) > 0 {
@@ -85,7 +97,7 @@ func RefreshRender(g *GameState) {
 // refreshRenderForDiscard renders the game state with farm item indices shown and hand indices hidden.
 // Used during Lightning Storm and Tornado events.
 func refreshRenderForDiscard(g *GameState) {
-	ClearScreen()
+	clearScreen()
 	fmt.Printf("%s\n", g.StatsString())
 	fmt.Printf("%s %d\n%s\n---\n", g.Turn, g.NightNum, g.PublicDayCards)
 	for i, player := range g.Players {
@@ -105,7 +117,7 @@ func refreshRenderForDiscard(g *GameState) {
 // refreshRenderForNight renders the game state with farm stack indices shown and hand indices hidden.
 // Used during zombie attacks at night.
 func refreshRenderForNight(g *GameState) {
-	ClearScreen()
+	clearScreen()
 	fmt.Printf("%s\n", g.StatsString())
 	fmt.Printf("%s %d\n%s\n---\n", g.Turn, g.NightNum, g.PublicDayCards)
 	for i, player := range g.Players {
@@ -125,8 +137,8 @@ func refreshRenderForNight(g *GameState) {
 // GatherCLIInput displays the prompt and gathers input from the user via CLI.
 // This should only be called in CLI mode.
 func GatherCLIInput(g *GameState, inputNeeded *PlayerInputNeeded) int {
-	if !CLIMode {
-		log.Fatalf("tried to get CLI input but CLIMode is %v", CLIMode)
+	if !cliMode {
+		log.Fatalf("tried to get CLI input but cliMode is %v", cliMode)
 	}
 
 	// Render the appropriate game state
@@ -151,7 +163,7 @@ func GatherCLIInput(g *GameState, inputNeeded *PlayerInputNeeded) int {
 		text := scanner.Text()
 		input, err := strconv.Atoi(text)
 		if err != nil {
-			fmt.Printf("ERROR, retry input: %s\n", IntSliceChoices(inputNeeded.ValidChoices...))
+			fmt.Printf("ERROR, retry input: %s\n", intSliceChoices(inputNeeded.ValidChoices...))
 			continue
 		}
 
@@ -160,6 +172,6 @@ func GatherCLIInput(g *GameState, inputNeeded *PlayerInputNeeded) int {
 				return input
 			}
 		}
-		fmt.Printf("ERROR, retry input: %s\n", IntSliceChoices(inputNeeded.ValidChoices...))
+		fmt.Printf("ERROR, retry input: %s\n", intSliceChoices(inputNeeded.ValidChoices...))
 	}
 }

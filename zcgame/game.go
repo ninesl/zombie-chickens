@@ -533,7 +533,7 @@ func (g *GameState) createDefenseChoiceInput() *PlayerInputNeeded {
 	return &PlayerInputNeeded{
 		Context:      InputContextDefense,
 		RenderType:   RenderForNight,
-		Message:      fmt.Sprintf("%s: choose stack to use or -1 to take life (stacks: %s)", player.Name, IntSliceChoices(allStacks1Based...)),
+		Message:      fmt.Sprintf("%s: choose stack to use or -1 to take life (stacks: %s)", player.Name, intSliceChoices(allStacks1Based...)),
 		ValidChoices: choices,
 		ValidStacks:  allStacks,
 	}

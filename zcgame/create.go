@@ -112,8 +112,8 @@ func (g *GameState) DebugEventsOnTop() {
 func createPlayer(g *GameState, name string, numPlayers int, playerIdx int) *Player {
 	// Apply color to player name if CLI mode
 	displayName := name
-	if CLIMode {
-		displayName = PlayerColors[playerIdx%len(PlayerColors)] + name + Reset
+	if cliMode {
+		displayName = playerColors[playerIdx%len(playerColors)] + name + reset
 	}
 
 	return &Player{
