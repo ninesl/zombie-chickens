@@ -1,9 +1,5 @@
 package zcgame
 
-import (
-	"fmt"
-)
-
 // countItemInStack returns how many times item appears in stack
 func countItemInStack(stack Stack, item FarmItemType) int {
 	count := 0
@@ -255,9 +251,21 @@ const (
 	RenderNone
 )
 
-// PlayerInputNeeded is returned when the game needs player input to continue.
+// PlayerInputNeeded signals that the game state machine requires player input to continue.
+// It implements the error interface for historical compatibility with early error-based flow control,
+// but it is not an error - it's a normal control flow signal in the state machine pattern.
+// The game loop checks for this type to pause execution and gather input from CLI or API.
+//
 // In CLI mode, this triggers input gathering from stdin.
 // In API mode, this should be returned to the caller to request input.
+//
+// Example usage pattern:
+//
+//	gameOver, inputNeeded := game.ContinueDay()
+//	if inputNeeded != nil {
+//	    input := gatherInput(inputNeeded)
+//	    gameOver, inputNeeded = game.ContinueAfterInput(input)
+//	}
 type PlayerInputNeeded struct {
 	Context      InputContext
 	RenderType   RenderType
@@ -269,20 +277,19 @@ type PlayerInputNeeded struct {
 	ValidStacks []int        // for InputContextPlayCard/InputContextDefense - valid stack indices
 }
 
+// Error implements the error interface. PlayerInputNeeded is used as a signal type
+// rather than an actual error, allowing type assertions in the game loop.
 func (e *PlayerInputNeeded) Error() string {
 	return "needs player input: " + e.Message
 }
 
-// Adds item to specific f.Stacks[index]. Does not do any checking, allows illegal Stacks
-func (f *Farm) addToStackIndex(item FarmItemType, stackIndex int) error {
-	if stackIndex >= len(f.Stacks) {
-		return fmt.Errorf("%d out of bounds, length of farm stacks is %d", stackIndex, len(f.Stacks))
-	} else if stackIndex < 0 {
-		return fmt.Errorf("%d must be a postive number", stackIndex)
+// addToStackIndex adds item to f.Stacks[stackIndex]. Only called internally by the state machine
+// with pre-validated indices from ValidChoices, so invalid indices indicate a bug and are ignored.
+func (f *Farm) addToStackIndex(item FarmItemType, stackIndex int) {
+	if stackIndex < 0 || stackIndex >= len(f.Stacks) {
+		return
 	}
-
 	f.Stacks[stackIndex] = append(f.Stacks[stackIndex], item)
-	return nil
 }
 
 func (s Stack) HasItem(item FarmItemType) bool {
@@ -294,8 +301,7 @@ func (s Stack) HasItem(item FarmItemType) bool {
 	return false
 }
 
-// returns true and the index of the first f.Stacks that contains the item
-// returns false and -1 if item does not exist in farm
+// HasItemInStacks returns true if any stack on the farm contains the specified item.
 func (f *Farm) HasItemInStacks(item FarmItemType) bool {
 	for _, stack := range f.Stacks {
 		if stack.HasItem(item) {
@@ -303,7 +309,6 @@ func (f *Farm) HasItemInStacks(item FarmItemType) bool {
 		}
 	}
 	return false
-	// return -1, false
 }
 
 // removes all Stacks from f.Stacks where len(f.Stacks[i]) == 0

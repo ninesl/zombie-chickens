@@ -29,7 +29,7 @@ func main() {
 	// Game loop with input handling
 	for {
 		// Try to advance the game
-		gameOver, inputNeeded := game.DoDay()
+		gameOver, inputNeeded := game.ContinueDay()
 
 		if inputNeeded != nil {
 			// CLI mode: gather input and continue

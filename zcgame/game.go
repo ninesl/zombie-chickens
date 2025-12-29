@@ -1,5 +1,25 @@
 package zcgame
 
+// State Machine Architecture
+//
+// This file implements the core game state machine for zombie-chickens. The design
+// supports interruptible execution to allow both CLI and API usage patterns.
+//
+// Public API:
+//   - ContinueDay() - Main entry point to advance game state
+//   - ContinueAfterInput() - Resume execution after player provides input
+//
+// Internal functions (lowercase prefix indicates state machine internals):
+//   - doPlayerDayTurn() - Processes one player's day turn
+//   - doNightTurn() - Processes the night phase
+//   - provideInput() - Routes player input to appropriate handler
+//   - provideDayInput() - Handles input during day turns
+//   - provideNightInput() - Handles input during night phase
+//
+// The DaySubStage and NightSubStage enums track where execution should resume
+// after player input is gathered. When a function returns *PlayerInputNeeded,
+// the current stage is saved so execution can resume at the correct point.
+
 import (
 	"fmt"
 )
@@ -8,15 +28,15 @@ func (g *GameState) CurrentPlayer() *Player {
 	return g.Players[g.CurrentPlayerIdx]
 }
 
-func (g *GameState) NextPlayer() {
+func (g *GameState) nextPlayer() {
 	g.CurrentPlayerIdx++
 	if g.CurrentPlayerIdx >= len(g.Players) {
 		g.CurrentPlayerIdx = 0
 	}
 }
 
-// EliminatePlayer discards all of a player's cards and removes them from the game.
-func (g *GameState) EliminatePlayer(player *Player) {
+// eliminatePlayer discards all of a player's cards and removes them from the game.
+func (g *GameState) eliminatePlayer(player *Player) {
 	// Find the player's index
 	playerIdx := -1
 	for i, p := range g.Players {
@@ -32,7 +52,7 @@ func (g *GameState) EliminatePlayer(player *Player) {
 	// Discard all farm cards
 	for _, stack := range player.Farm.Stacks {
 		for _, item := range stack {
-			g.DiscardDayCard(item)
+			g.discardDayCard(item)
 		}
 	}
 	player.Farm.Stacks = Stacks{}
@@ -40,14 +60,14 @@ func (g *GameState) EliminatePlayer(player *Player) {
 	// Discard all hand cards
 	for _, handItem := range player.Hand {
 		if handItem.FarmItemType != NUM_FARM_ITEMS {
-			g.DiscardDayCard(handItem.FarmItemType)
+			g.discardDayCard(handItem.FarmItemType)
 		}
 	}
 	player.Hand = Hand{}
 
 	// Discard remaining night cards
 	for _, nightCard := range player.Farm.NightCards {
-		g.DiscardNightCard(nightCard)
+		g.discardNightCard(nightCard)
 	}
 	player.Farm.NightCards = NightCards{}
 
@@ -62,10 +82,10 @@ func (g *GameState) EliminatePlayer(player *Player) {
 	}
 }
 
-// DoPlayerDayTurn processes one player's day turn.
+// doPlayerDayTurn processes one player's day turn using a state machine pattern.
 // Returns nil when the turn is complete, or *PlayerInputNeeded when input is required.
-// Call ProvideInput with the player's choice, then call DoPlayerDayTurn again to continue.
-func (g *GameState) DoPlayerDayTurn() *PlayerInputNeeded {
+// This is an internal function - external callers should use ContinueDay/ContinueAfterInput.
+func (g *GameState) doPlayerDayTurn() *PlayerInputNeeded {
 	player := g.CurrentPlayer()
 
 	for {
@@ -150,9 +170,9 @@ func (g *GameState) createStackSelectionInput() *PlayerInputNeeded {
 	}
 }
 
-// ProvideInput provides the player's input and continues game execution.
+// provideInput provides the player's input and continues game execution.
 // Returns nil when the current operation is complete, or *PlayerInputNeeded if more input is needed.
-func (g *GameState) ProvideInput(choice int) *PlayerInputNeeded {
+func (g *GameState) provideInput(choice int) *PlayerInputNeeded {
 	switch g.Turn {
 	case Morning, Afternoon:
 		return g.provideDayInput(choice)
@@ -169,12 +189,12 @@ func (g *GameState) provideDayInput(choice int) *PlayerInputNeeded {
 	switch g.DaySubStage {
 	case DaySubStageOptionalDiscard:
 		if choice != 0 {
-			g.DiscardDayCard(player.Hand[choice-1].FarmItemType)
-			player.Hand[choice-1] = HandItem{FarmItemType: g.NextDayCard()}
+			g.discardDayCard(player.Hand[choice-1].FarmItemType)
+			player.Hand[choice-1] = HandItem{FarmItemType: g.nextDayCard()}
 			player.Hand.Sort()
 		}
 		g.DaySubStage = DaySubStagePlay1
-		return g.DoPlayerDayTurn()
+		return g.doPlayerDayTurn()
 
 	case DaySubStagePlay1:
 		g.PendingCardItem = player.Hand[choice-1].FarmItemType
@@ -182,13 +202,13 @@ func (g *GameState) provideDayInput(choice int) *PlayerInputNeeded {
 		if result != nil {
 			// Need stack selection
 			g.DaySubStage = DaySubStagePlay1Stack
-			return g.DoPlayerDayTurn()
+			return g.doPlayerDayTurn()
 		}
 		// Card played successfully
 		player.Hand[choice-1] = HandItem{FarmItemType: NUM_FARM_ITEMS}
 		player.Hand.Sort()
 		g.DaySubStage = DaySubStagePlay2
-		return g.DoPlayerDayTurn()
+		return g.doPlayerDayTurn()
 
 	case DaySubStagePlay1Stack:
 		if choice == 0 {
@@ -207,7 +227,7 @@ func (g *GameState) provideDayInput(choice int) *PlayerInputNeeded {
 		}
 		player.Hand.Sort()
 		g.DaySubStage = DaySubStagePlay2
-		return g.DoPlayerDayTurn()
+		return g.doPlayerDayTurn()
 
 	case DaySubStagePlay2:
 		g.PendingCardItem = player.Hand[choice-1].FarmItemType
@@ -215,13 +235,13 @@ func (g *GameState) provideDayInput(choice int) *PlayerInputNeeded {
 		if result != nil {
 			// Need stack selection
 			g.DaySubStage = DaySubStagePlay2Stack
-			return g.DoPlayerDayTurn()
+			return g.doPlayerDayTurn()
 		}
 		// Card played successfully
 		player.Hand[choice-1] = HandItem{FarmItemType: NUM_FARM_ITEMS}
 		player.Hand.Sort()
 		g.DaySubStage = DaySubStageDraw
-		return g.DoPlayerDayTurn()
+		return g.doPlayerDayTurn()
 
 	case DaySubStagePlay2Stack:
 		if choice == 0 { // New stack
@@ -238,37 +258,39 @@ func (g *GameState) provideDayInput(choice int) *PlayerInputNeeded {
 		}
 		player.Hand.Sort()
 		g.DaySubStage = DaySubStageDraw
-		return g.DoPlayerDayTurn()
+		return g.doPlayerDayTurn()
 
 	case DaySubStageDraw:
+		player.Hand.Sort()
 		if choice == 1 {
 			player.Hand[3] = HandItem{FarmItemType: g.PublicDayCards[0]}
 			player.Hand[4] = HandItem{FarmItemType: g.PublicDayCards[1]}
-			g.DealPublicDayCards()
+			g.dealPublicDayCards()
 		} else {
-			player.Hand[3] = HandItem{FarmItemType: g.NextDayCard()}
-			player.Hand[4] = HandItem{FarmItemType: g.NextDayCard()}
+			player.Hand[3] = HandItem{FarmItemType: g.nextDayCard()}
+			player.Hand[4] = HandItem{FarmItemType: g.nextDayCard()}
 		}
 		// Turn complete - reset substage and advance player
 		g.DaySubStage = DaySubStageOptionalDiscard
 		g.PlayerTurnIndex++
-		g.NextPlayer()
+		g.nextPlayer()
 		return nil
 	}
 
 	return nil
 }
 
-// DoNightTurn processes the night phase.
+// doNightTurn processes the night phase using a state machine pattern.
 // Returns nil when complete, or *PlayerInputNeeded when input is required.
-func (g *GameState) DoNightTurn() *PlayerInputNeeded {
+// This is an internal function - external callers should use ContinueDay/ContinueAfterInput.
+func (g *GameState) doNightTurn() *PlayerInputNeeded {
 	g.StageInTurn = Nighttime
 
 	// Deal night cards once at the start of night
 	if !g.NightCardsDealt {
 		for _, player := range g.Players {
 			for range g.NightNum {
-				player.Farm.NightCards = append(player.Farm.NightCards, g.NextNightCard())
+				player.Farm.NightCards = append(player.Farm.NightCards, g.nextNightCard())
 			}
 		}
 		g.NightCardsDealt = true
@@ -367,7 +389,7 @@ func (g *GameState) processNightCards() *PlayerInputNeeded {
 			// Move to next player
 			g.NightPlayerIndex++
 			if len(g.Players) > 0 {
-				g.NextPlayer()
+				g.nextPlayer()
 			}
 		}
 
@@ -426,7 +448,7 @@ func (g *GameState) createEventDiscardInput() *PlayerInputNeeded {
 		if g.EventDiscardRemaining >= totalItems {
 			for _, stack := range player.Farm.Stacks {
 				for _, item := range stack {
-					g.DiscardDayCard(item)
+					g.discardDayCard(item)
 				}
 			}
 			player.Farm.Stacks = Stacks{}
@@ -455,14 +477,14 @@ func (g *GameState) createEventDiscardInput() *PlayerInputNeeded {
 	player := g.CurrentPlayer()
 	if len(player.Farm.NightCards) > 0 {
 		nightCard := player.Farm.NightCards[0]
-		g.DiscardNightCard(nightCard)
+		g.discardNightCard(nightCard)
 		player.Farm.NightCards = player.Farm.NightCards[1:]
 	}
 
 	// Move to next player in night round
 	g.NightPlayerIndex++
 	if len(g.Players) > 0 {
-		g.NextPlayer()
+		g.nextPlayer()
 	}
 	g.NightSubStage = NightSubStageProcessCards
 	return g.processNightCards()
@@ -525,7 +547,7 @@ func (g *GameState) provideNightInput(choice int) *PlayerInputNeeded {
 	case NightSubStageZombieAutoKilled:
 		// Now remove the night card after confirmation
 		if g.CurrentNightCard != nil {
-			g.DiscardNightCard(*g.CurrentNightCard)
+			g.discardNightCard(*g.CurrentNightCard)
 		}
 		if len(player.Farm.NightCards) > 0 {
 			player.Farm.NightCards = player.Farm.NightCards[1:]
@@ -533,7 +555,7 @@ func (g *GameState) provideNightInput(choice int) *PlayerInputNeeded {
 		// Continue to next player
 		g.NightPlayerIndex++
 		if len(g.Players) > 0 {
-			g.NextPlayer()
+			g.nextPlayer()
 		}
 		g.NightSubStage = NightSubStageProcessCards
 		return g.processNightCards()
@@ -546,18 +568,19 @@ func (g *GameState) provideNightInput(choice int) *PlayerInputNeeded {
 		}
 		// Remove the night card
 		if len(player.Farm.NightCards) > 0 {
+			g.discardNightCard(player.Farm.NightCards[0])
 			player.Farm.NightCards = player.Farm.NightCards[1:]
 		}
 		g.NightPlayerIndex++
 		if len(g.Players) > 0 {
-			g.NextPlayer()
+			g.nextPlayer()
 		}
 		g.NightSubStage = NightSubStageProcessCards
 		return g.processNightCards()
 
 	case NightSubStageEliminated:
 		playerToEliminate := player
-		g.EliminatePlayer(playerToEliminate)
+		g.eliminatePlayer(playerToEliminate)
 		g.NightPlayerIndex++
 		// Don't call NextPlayer - EliminatePlayer already adjusted indices
 		g.NightSubStage = NightSubStageProcessCards
@@ -570,8 +593,9 @@ func (g *GameState) provideNightInput(choice int) *PlayerInputNeeded {
 		}
 		g.ChosenStackIdx = choice - 1
 
-		// Check if we need shield prompt - skip if stack contains one-time-use items
-		// (except Ammo, since Shotgun+Ammo stacks should still prompt for shield)
+		// Check if we need shield prompt - skip for one-time-use items that will be consumed anyway
+		// (BoobyTrap, WOLR, Shield itself). Ammo is excluded from this skip because Shotgun+Ammo stacks
+		// are reusable (only Ammo is consumed), so the player may want to use a Shield to protect the Shotgun.
 		stackUsed := player.Farm.Stacks[g.ChosenStackIdx]
 		skipShieldPrompt := false
 		for _, item := range stackUsed {
@@ -590,14 +614,14 @@ func (g *GameState) provideNightInput(choice int) *PlayerInputNeeded {
 		// Use defense without shield
 		player.Farm.UseDefenseStack(g.ChosenStackIdx, zc, false, g)
 		if g.CurrentNightCard != nil {
-			g.DiscardNightCard(*g.CurrentNightCard)
+			g.discardNightCard(*g.CurrentNightCard)
 		}
 		if len(player.Farm.NightCards) > 0 {
 			player.Farm.NightCards = player.Farm.NightCards[1:]
 		}
 		g.NightPlayerIndex++
 		if len(g.Players) > 0 {
-			g.NextPlayer()
+			g.nextPlayer()
 		}
 		g.NightSubStage = NightSubStageProcessCards
 		return g.processNightCards()
@@ -607,14 +631,14 @@ func (g *GameState) provideNightInput(choice int) *PlayerInputNeeded {
 		zc := *g.CurrentZombie
 		player.Farm.UseDefenseStack(g.ChosenStackIdx, zc, useShield, g)
 		if g.CurrentNightCard != nil {
-			g.DiscardNightCard(*g.CurrentNightCard)
+			g.discardNightCard(*g.CurrentNightCard)
 		}
 		if len(player.Farm.NightCards) > 0 {
 			player.Farm.NightCards = player.Farm.NightCards[1:]
 		}
 		g.NightPlayerIndex++
 		if len(g.Players) > 0 {
-			g.NextPlayer()
+			g.nextPlayer()
 		}
 		g.NightSubStage = NightSubStageProcessCards
 		return g.processNightCards()
@@ -630,7 +654,7 @@ func (g *GameState) provideNightInput(choice int) *PlayerInputNeeded {
 		}
 		g.NightPlayerIndex++
 		if len(g.Players) > 0 {
-			g.NextPlayer()
+			g.nextPlayer()
 		}
 		g.NightSubStage = NightSubStageProcessCards
 		return g.processNightCards()
@@ -651,7 +675,7 @@ func (g *GameState) provideNightInput(choice int) *PlayerInputNeeded {
 		// Action complete with no further input needed
 		// NOW remove and discard the event card
 		// (must be after action for events like Blood Moon that append to NightCards)
-		g.DiscardNightCard(nightCard)
+		g.discardNightCard(nightCard)
 		if len(player.Farm.NightCards) > 0 {
 			player.Farm.NightCards = player.Farm.NightCards[1:]
 		}
@@ -659,7 +683,7 @@ func (g *GameState) provideNightInput(choice int) *PlayerInputNeeded {
 		// Move to next player
 		g.NightPlayerIndex++
 		if len(g.Players) > 0 {
-			g.NextPlayer()
+			g.nextPlayer()
 		}
 		g.NightSubStage = NightSubStageProcessCards
 		return g.processNightCards()
@@ -699,11 +723,11 @@ func (g *GameState) resetNightState() {
 	g.EventDiscardTotal = 0
 }
 
-// DoDay runs a full day cycle.
+// ContinueDay runs a full day cycle.
 // Returns (true, nil) if the day completed and game continues.
 // Returns (false, nil) if game over.
 // Returns (bool, *PlayerInputNeeded) if input is needed.
-func (g *GameState) DoDay() (bool, *PlayerInputNeeded) {
+func (g *GameState) ContinueDay() (bool, *PlayerInputNeeded) {
 	if len(g.Players) == 0 {
 		return false, nil
 	}
@@ -712,7 +736,7 @@ func (g *GameState) DoDay() (bool, *PlayerInputNeeded) {
 	switch g.Turn {
 	case Morning:
 		for g.PlayerTurnIndex < len(g.Players) {
-			inputNeeded := g.DoPlayerDayTurn()
+			inputNeeded := g.doPlayerDayTurn()
 			if inputNeeded != nil {
 				return true, inputNeeded
 			}
@@ -721,11 +745,11 @@ func (g *GameState) DoDay() (bool, *PlayerInputNeeded) {
 		// Morning complete - move to afternoon
 		g.PlayerTurnIndex = 0
 		g.Turn = Afternoon
-		return g.DoDay()
+		return g.ContinueDay()
 
 	case Afternoon:
 		for g.PlayerTurnIndex < len(g.Players) {
-			inputNeeded := g.DoPlayerDayTurn()
+			inputNeeded := g.doPlayerDayTurn()
 			if inputNeeded != nil {
 				return true, inputNeeded
 			}
@@ -734,10 +758,10 @@ func (g *GameState) DoDay() (bool, *PlayerInputNeeded) {
 		// Afternoon complete - move to night
 		g.PlayerTurnIndex = 0
 		g.Turn = Night
-		return g.DoDay()
+		return g.ContinueDay()
 
 	case Night:
-		inputNeeded := g.DoNightTurn()
+		inputNeeded := g.doNightTurn()
 		if inputNeeded != nil {
 			return true, inputNeeded
 		}
@@ -761,13 +785,13 @@ func (g *GameState) DoDay() (bool, *PlayerInputNeeded) {
 // gameOver is true if the game has ended.
 // inputNeeded is non-nil if more input is required.
 func (g *GameState) ContinueAfterInput(choice int) (bool, *PlayerInputNeeded) {
-	inputNeeded := g.ProvideInput(choice)
+	inputNeeded := g.provideInput(choice)
 	if inputNeeded != nil {
 		return false, inputNeeded
 	}
 
 	// Continue the day
-	return g.DoDay()
+	return g.ContinueDay()
 }
 
 func (g *GameState) HasLivingPlayers() bool {

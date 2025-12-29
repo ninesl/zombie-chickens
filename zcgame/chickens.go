@@ -176,7 +176,7 @@ func (f *Farm) UseDefenseStack(stackIdx int, zc ZombieChicken, useShield bool, g
 	if stack.HasItem(WOLR) {
 		for _, s := range f.Stacks {
 			for _, item := range s {
-				g.DiscardDayCard(item)
+				g.discardDayCard(item)
 			}
 		}
 		f.Stacks = Stacks{}
@@ -190,14 +190,14 @@ func (f *Farm) UseDefenseStack(stackIdx int, zc ZombieChicken, useShield bool, g
 			for i := range f.Stacks {
 				if f.Stacks[i].HasItem(Shield) {
 					f.Stacks[i].RemoveItem(Shield)
-					g.DiscardDayCard(Shield)
+					g.discardDayCard(Shield)
 					break
 				}
 			}
 		} else {
 			// Discard all items in the destroyed stack
 			for _, item := range f.Stacks[stackIdx] {
-				g.DiscardDayCard(item)
+				g.discardDayCard(item)
 			}
 			f.Stacks[stackIdx] = Stack{}
 			f.clearStacks()
@@ -208,11 +208,11 @@ func (f *Farm) UseDefenseStack(stackIdx int, zc ZombieChicken, useShield bool, g
 	// Remove one-time-use items
 	if stack.HasItem(Ammo) {
 		f.Stacks[stackIdx].RemoveItem(Ammo)
-		g.DiscardDayCard(Ammo)
+		g.discardDayCard(Ammo)
 	}
 	if stack.HasItem(BoobyTrap) {
 		f.Stacks[stackIdx].RemoveItem(BoobyTrap)
-		g.DiscardDayCard(BoobyTrap)
+		g.discardDayCard(BoobyTrap)
 	}
 
 	f.clearStacks()

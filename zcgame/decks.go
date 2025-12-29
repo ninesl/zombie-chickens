@@ -1,13 +1,13 @@
 package zcgame
 
 // pops the first element of g.DayDeck, refills and shuffles when g.DayDeck <= 1
-func (g *GameState) NextDayCard() FarmItemType {
+func (g *GameState) nextDayCard() FarmItemType {
 	if len(g.DayDeck) == 0 {
-		g.RefillDayCards()
+		g.refillDayCards()
 	} else if len(g.DayDeck) == 1 {
 		card := g.DayDeck[0]
-		g.DayDeck = g.DayDeck[0:] // clear
-		g.RefillDayCards()
+		g.DayDeck = g.DayDeck[:0] // clear
+		g.refillDayCards()
 		return card
 	}
 
@@ -17,26 +17,26 @@ func (g *GameState) NextDayCard() FarmItemType {
 	return card
 }
 
-func (g *GameState) DiscardDayCard(item FarmItemType) {
+func (g *GameState) discardDayCard(item FarmItemType) {
 	g.DiscardedDayCards[item]++
 }
 
-func (g *GameState) RefillDayCards() {
+func (g *GameState) refillDayCards() {
 	for farmItem, amount := range g.DiscardedDayCards {
 		for range amount {
 			g.DayDeck = append(g.DayDeck, farmItem)
 		}
 	}
 
-	Shuffle(g.DayDeck)
+	shuffle(g.DayDeck)
 
 	g.DiscardedDayCards = map[FarmItemType]int{} // clear
 }
 
-func (g *GameState) NextNightCard() NightCard {
+func (g *GameState) nextNightCard() NightCard {
 	if len(g.NightDeck) == 0 {
 		g.NightDeck = g.DiscardedNightCards
-		Shuffle(g.NightDeck)
+		shuffle(g.NightDeck)
 		g.DiscardedNightCards = make([]NightCard, 0)
 	}
 	nightCard := g.NightDeck[0]
@@ -45,7 +45,7 @@ func (g *GameState) NextNightCard() NightCard {
 	return nightCard
 }
 
-func (g *GameState) DiscardNightCard(n NightCard) {
+func (g *GameState) discardNightCard(n NightCard) {
 	if g.DiscardedNightCards == nil {
 		g.DiscardedNightCards = make([]NightCard, 0)
 	}

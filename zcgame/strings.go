@@ -286,6 +286,9 @@ func (s Stacks) StringForNight() string {
 	return result
 }
 
+// stringWithIndices returns a string representation of stacks.
+// NOTE: This sorts the stacks in-place for consistent display ordering.
+// This is acceptable because stack order has no gameplay significance.
 func (s Stacks) stringWithIndices(showIndices bool) string {
 	// Sort each inner stack by FarmItemType
 	for i := range s {
@@ -383,7 +386,8 @@ func (h *Hand) stringWithIndices(showIndices bool) string {
 	return result
 }
 
-// Sort sorts the hand in-place by visible (true first), then by FarmItemType
+// Sort sorts the hand in-place by visible (true first), then by FarmItemType.
+// This is called during String() formatting for consistent display.
 func (h *Hand) Sort() {
 	sort.Slice(h[:], func(i, j int) bool {
 		if h[i].Visible != h[j].Visible {

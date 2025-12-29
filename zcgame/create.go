@@ -3,7 +3,7 @@ package zcgame
 import "fmt"
 
 // random order based on DayCards global variable configs
-func CreateDayDeck() Stack {
+func createDayDeck() Stack {
 	var deck = Stack{}
 	for farmItem, amount := range DayCardAmounts {
 		for range amount {
@@ -11,12 +11,12 @@ func CreateDayDeck() Stack {
 		}
 	}
 
-	Shuffle(deck)
+	shuffle(deck)
 
 	return deck
 }
 
-func CreateNightDeck() []NightCard {
+func createNightDeck() []NightCard {
 	var deck = make([]NightCard, 0)
 	for zKey, zombie := range ZombieChickens {
 		for range zombie.NumInDeck {
@@ -33,7 +33,7 @@ func CreateNightDeck() []NightCard {
 		})
 	}
 
-	Shuffle(deck)
+	shuffle(deck)
 
 	return deck
 }
@@ -47,8 +47,8 @@ var (
 	}
 )
 
-func (g *GameState) DealPublicDayCards() {
-	g.PublicDayCards = [2]FarmItemType{g.NextDayCard(), g.NextDayCard()}
+func (g *GameState) dealPublicDayCards() {
+	g.PublicDayCards = [2]FarmItemType{g.nextDayCard(), g.nextDayCard()}
 }
 
 func CreateNewGame(playerNames ...string) (*GameState, error) {
@@ -59,8 +59,8 @@ func CreateNewGame(playerNames ...string) (*GameState, error) {
 	}
 
 	var g = &GameState{
-		DayDeck:             CreateDayDeck(),
-		NightDeck:           CreateNightDeck(),
+		DayDeck:             createDayDeck(),
+		NightDeck:           createNightDeck(),
 		Turn:                Morning,
 		StageInTurn:         OptionalDiscard,
 		CurrentPlayerIdx:    0, //redundant
@@ -69,7 +69,7 @@ func CreateNewGame(playerNames ...string) (*GameState, error) {
 		DiscardedNightCards: NightCards{},
 	}
 
-	g.DealPublicDayCards()
+	g.dealPublicDayCards()
 	g.Players = make([]*Player, 0, len(playerNames))
 	for i, name := range playerNames {
 		g.Players = append(g.Players, createPlayer(g, name, len(playerNames), i))
@@ -124,11 +124,11 @@ func createPlayer(g *GameState, name string, numPlayers int, playerIdx int) *Pla
 			NightCards: NightCards{},
 		},
 		Hand: Hand{
-			HandItem{FarmItemType: g.NextDayCard()},
-			HandItem{FarmItemType: g.NextDayCard()},
-			HandItem{FarmItemType: g.NextDayCard()},
-			HandItem{FarmItemType: g.NextDayCard()},
-			HandItem{FarmItemType: g.NextDayCard()},
+			HandItem{FarmItemType: g.nextDayCard()},
+			HandItem{FarmItemType: g.nextDayCard()},
+			HandItem{FarmItemType: g.nextDayCard()},
+			HandItem{FarmItemType: g.nextDayCard()},
+			HandItem{FarmItemType: g.nextDayCard()},
 		},
 		PlayChoices: PlayerPlayChoices{
 			AutoloadShotgun:  true,

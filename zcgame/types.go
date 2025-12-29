@@ -5,8 +5,8 @@ import (
 	"math/rand"
 )
 
-// Shuffle shuffles all elements of a slice in-place and also returns the slice.
-func Shuffle[T any](slice []T) []T {
+// shuffle shuffles all elements of a slice in-place and also returns the slice.
+func shuffle[T any](slice []T) []T {
 	rand.Shuffle(len(slice), func(i, j int) {
 		slice[i], slice[j] = slice[j], slice[i]
 	})
@@ -40,7 +40,7 @@ const (
 	Morning Turn = iota
 	Afternoon
 	Night
-	Day // used for co-op
+	Day // TODO: implement co-op mode
 )
 
 type StageInTurn uint8
@@ -135,7 +135,7 @@ const (
 	Bulletproof                    // OVERCOMES: Shotgun
 	Fireproof                      // OVERCOMES: Flamethrower
 	Timid                          // Timid zombies are frightened by scarecrows
-	Exploding                      // Expldoing zombies destroy the stack used to defeat it
+	Exploding                      // Exploding zombies destroy the stack used to defeat it
 	NUM_ZOMBIE_TRAITS
 )
 
@@ -177,7 +177,7 @@ var (
 				for i := range g.Players {
 					idx := (g.CurrentPlayerIdx + i) % len(g.Players)
 					for range 3 {
-						g.Players[idx].Farm.NightCards = append(g.Players[idx].Farm.NightCards, g.NextNightCard())
+						g.Players[idx].Farm.NightCards = append(g.Players[idx].Farm.NightCards, g.nextNightCard())
 					}
 				}
 				return nil
@@ -189,8 +189,8 @@ var (
 			Action: func(g *GameState) *PlayerInputNeeded {
 				for i := range g.Players {
 					idx := (g.CurrentPlayerIdx + i) % len(g.Players)
-					g.Players[idx].Farm.NightCards = append(g.Players[idx].Farm.NightCards, g.NextNightCard())
-					g.Players[idx].Farm.NightCards = append(g.Players[idx].Farm.NightCards, g.NextNightCard())
+					g.Players[idx].Farm.NightCards = append(g.Players[idx].Farm.NightCards, g.nextNightCard())
+					g.Players[idx].Farm.NightCards = append(g.Players[idx].Farm.NightCards, g.nextNightCard())
 				}
 				return nil
 			},
@@ -205,7 +205,7 @@ var (
 						for j := range g.Players[idx].Farm.Stacks {
 							if g.Players[idx].Farm.Stacks[j].HasItem(BoobyTrap) {
 								g.Players[idx].Farm.Stacks[j].RemoveItem(BoobyTrap)
-								g.DiscardDayCard(BoobyTrap)
+								g.discardDayCard(BoobyTrap)
 							}
 						}
 					}
@@ -223,11 +223,11 @@ var (
 					for j := range g.Players[idx].Farm.Stacks {
 						if g.Players[idx].Farm.Stacks[j].HasItem(Flamethrower) {
 							g.Players[idx].Farm.Stacks[j].RemoveItem(Flamethrower)
-							g.DiscardDayCard(Flamethrower)
+							g.discardDayCard(Flamethrower)
 						}
 						if g.Players[idx].Farm.Stacks[j].HasItem(Fuel) {
 							g.Players[idx].Farm.Stacks[j].RemoveItem(Fuel)
-							g.DiscardDayCard(Fuel)
+							g.discardDayCard(Fuel)
 						}
 					}
 					g.Players[idx].Farm.clearStacks()
@@ -242,7 +242,7 @@ var (
 				for i := range g.Players {
 					idx := (g.CurrentPlayerIdx + i) % len(g.Players)
 					for _, card := range g.Players[idx].Farm.NightCards {
-						g.DiscardNightCard(card)
+						g.discardNightCard(card)
 					}
 					g.Players[idx].Farm.NightCards = g.Players[idx].Farm.NightCards[:0] // clear
 				}
@@ -264,12 +264,16 @@ type NightCard struct {
 
 type NightCards []NightCard
 
-// redundant with IsEvent
+// IsZombie returns true if this night card contains a zombie (not an event).
+// Both IsZombie and IsEvent exist for semantic clarity in different contexts -
+// use whichever reads more naturally in your code.
 func (n NightCard) IsZombie() bool {
 	return n.ZombieKey != -1
 }
 
-// redundant with IsZombie
+// IsEvent returns true if this night card contains an event (not a zombie).
+// Both IsZombie and IsEvent exist for semantic clarity in different contexts -
+// use whichever reads more naturally in your code.
 func (n NightCard) IsEvent() bool {
 	return n.ZombieKey == -1
 }
@@ -279,7 +283,7 @@ type FarmItemType uint16
 const (
 	HayBale      FarmItemType = iota // 20 | Stack 3 Hay Bales to build a Hay Wall
 	Scarecrow                        //  6 | Scares away Timid Zombies
-	Shotgun                          // 14 | Combies with Ammo to blast a zombie
+	Shotgun                          // 14 | Combines with Ammo to blast a zombie
 	Ammo                             // 24 | Combine with Shotgun to blast a zombie (1-Time-Use)
 	BoobyTrap                        // 10 | Terminates 1 Zombie (1-Time-Use)
 	Shield                           //  6 | Shields a stack from an Exploding Zombie (1-Time-Use)
@@ -299,18 +303,6 @@ func (f FarmItemType) IsOneTimeUse() bool {
 }
 
 var (
-	// needed to check if every farm item in stack exists uniquely (3 unique hay bales, 1 shotgun + any # ammo...)
-	StackNeededForLiveLookup = map[FarmItemType]Stack{
-		HayBale:      {HayBale, HayBale, HayBale},
-		Scarecrow:    {Scarecrow},
-		Shotgun:      {}, // explicitly blank, ammo is used bc of one time use
-		Ammo:         {Shotgun, Ammo},
-		BoobyTrap:    {BoobyTrap},
-		Shield:       {Shield},
-		Flamethrower: {Flamethrower, Fuel},
-		Fuel:         {}, // flamethrower is used
-		WOLR:         {WOLR},
-	}
 	// legal farm items key can be stacked with, if blank must be a new stack
 	CanBeStackedWithLookup = map[FarmItemType]Stack{
 		HayBale:      {HayBale},
@@ -323,17 +315,7 @@ var (
 		Fuel:         {Flamethrower},
 		WOLR:         {},
 	}
-	FarmItemTraitWeakness = map[FarmItemType]ZombieTrait{
-		HayBale:      Flying,
-		Scarecrow:    NUM_ZOMBIE_TRAITS, //TODO:FIXME: special case??
-		Shotgun:      Bulletproof,       //technically unneeded
-		Ammo:         Bulletproof,
-		BoobyTrap:    Flying,
-		Shield:       NUM_ZOMBIE_TRAITS, //TODO:FIXME: special case??
-		Flamethrower: Fireproof,
-		Fuel:         Fireproof,         //same as shotgun
-		WOLR:         NUM_ZOMBIE_TRAITS, //TODO:FIXME: special case
-	}
+
 	DayCardAmounts = map[FarmItemType]int{
 		HayBale:      20,
 		Scarecrow:    6,
@@ -373,6 +355,7 @@ type Farm struct {
 
 // RemoveItemByFlatIndex removes an item by its flat index across all stacks.
 // Returns the removed item type, or NUM_FARM_ITEMS if index is out of bounds.
+// This is called internally by the state machine with pre-validated indices from event discards.
 func (f *Farm) RemoveItemByFlatIndex(flatIdx int, g *GameState) FarmItemType {
 	idx := 0
 	for i := range f.Stacks {
@@ -381,7 +364,7 @@ func (f *Farm) RemoveItemByFlatIndex(flatIdx int, g *GameState) FarmItemType {
 				item := f.Stacks[i][j]
 				f.Stacks[i] = append(f.Stacks[i][:j], f.Stacks[i][j+1:]...)
 				f.clearStacks()
-				g.DiscardDayCard(item)
+				g.discardDayCard(item)
 				return item
 			}
 			idx++

@@ -3,13 +3,16 @@ package zcgame
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"runtime"
 	"strconv"
 )
 
-// CLIMode controls whether ANSI escape codes are used in String() output
+// CLIMode controls whether ANSI escape codes are used in String() output.
+// This is set once at startup and should be treated as read-only thereafter.
+// Set to false before creating a game if building an API server instead of CLI.
 var CLIMode = true
 
 // ANSI escape codes
@@ -64,7 +67,9 @@ func ClearScreen() {
 	}
 
 	cmd.Stdout = os.Stdout
-	cmd.Run()
+	if err := cmd.Run(); err != nil {
+		log.Fatalf("crashed when clearing screen: %v", err)
+	}
 }
 
 // RefreshRender clears screen and prints game state
@@ -77,9 +82,9 @@ func RefreshRender(g *GameState) {
 	}
 }
 
-// RefreshRenderForDiscard renders the game state with farm item indices shown and hand indices hidden.
+// refreshRenderForDiscard renders the game state with farm item indices shown and hand indices hidden.
 // Used during Lightning Storm and Tornado events.
-func RefreshRenderForDiscard(g *GameState) {
+func refreshRenderForDiscard(g *GameState) {
 	ClearScreen()
 	fmt.Printf("%s\n", g.StatsString())
 	fmt.Printf("%s %d\n%s\n---\n", g.Turn, g.NightNum, g.PublicDayCards)
@@ -97,9 +102,9 @@ func RefreshRenderForDiscard(g *GameState) {
 	}
 }
 
-// RefreshRenderForNight renders the game state with farm stack indices shown and hand indices hidden.
+// refreshRenderForNight renders the game state with farm stack indices shown and hand indices hidden.
 // Used during zombie attacks at night.
-func RefreshRenderForNight(g *GameState) {
+func refreshRenderForNight(g *GameState) {
 	ClearScreen()
 	fmt.Printf("%s\n", g.StatsString())
 	fmt.Printf("%s %d\n%s\n---\n", g.Turn, g.NightNum, g.PublicDayCards)
@@ -120,14 +125,18 @@ func RefreshRenderForNight(g *GameState) {
 // GatherCLIInput displays the prompt and gathers input from the user via CLI.
 // This should only be called in CLI mode.
 func GatherCLIInput(g *GameState, inputNeeded *PlayerInputNeeded) int {
+	if !CLIMode {
+		log.Fatalf("tried to get CLI input but CLIMode is %v", CLIMode)
+	}
+
 	// Render the appropriate game state
 	switch inputNeeded.RenderType {
 	case RenderNormal:
 		RefreshRender(g)
 	case RenderForDiscard:
-		RefreshRenderForDiscard(g)
+		refreshRenderForDiscard(g)
 	case RenderForNight:
-		RefreshRenderForNight(g)
+		refreshRenderForNight(g)
 	case RenderNone:
 		// No render
 	}
