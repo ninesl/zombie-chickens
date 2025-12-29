@@ -2,7 +2,7 @@ package zcgame
 
 import "fmt"
 
-// random order based on DayCards global variable configs
+// createDayDeck creates a shuffled deck of day cards based on DayCardAmounts.
 func createDayDeck() Stack {
 	var deck = Stack{}
 	for farmItem, amount := range DayCardAmounts {
@@ -16,6 +16,7 @@ func createDayDeck() Stack {
 	return deck
 }
 
+// createNightDeck creates a shuffled deck of night cards containing all zombies and events.
 func createNightDeck() []NightCard {
 	var deck = make([]NightCard, 0)
 	for zKey, zombie := range ZombieChickens {
@@ -38,27 +39,39 @@ func createNightDeck() []NightCard {
 	return deck
 }
 
-var (
-	StartingLivesLookup = map[int]int{
-		1: 5,
-		2: 5,
-		3: 4,
-		4: 4,
-	}
-)
+// StartingLivesLookup maps player count to starting lives per player.
+// Fewer players get more lives to balance difficulty.
+var StartingLivesLookup = map[int]int{
+	1: 5,
+	2: 5,
+	3: 4,
+	4: 4,
+}
 
-func (g *GameState) dealPublicDayCards() {
+// dealPublicDayCards draws two cards from the day deck to be the public cards.
+func (g *gameState) dealPublicDayCards() {
 	g.PublicDayCards = [2]FarmItemType{g.nextDayCard(), g.nextDayCard()}
 }
 
-func CreateNewGame(playerNames ...string) (*GameState, error) {
+// CreateNewGame initializes a new game with the given player names.
+// Returns a GameView for interacting with the game, or an error if the
+// player count is invalid (must be 1-4 players).
+//
+// The game is initialized with:
+//   - Shuffled day and night decks
+//   - Each player with starting lives (based on player count) and 5 cards
+//   - Two public day cards face-up for drawing
+//   - Turn set to Morning, ready for the first player's turn
+//
+// After creation, call ContinueDay() on the returned GameView to begin the game.
+func CreateNewGame(playerNames ...string) (GameView, error) {
 	if len(playerNames) == 0 {
-		return nil, fmt.Errorf("must provide at least 1 player")
+		return GameView{}, fmt.Errorf("must provide at least 1 player")
 	} else if len(playerNames) > 4 {
-		return nil, fmt.Errorf("must provide max 4 player names")
+		return GameView{}, fmt.Errorf("must provide max 4 player names")
 	}
 
-	var g = &GameState{
+	var g = &gameState{
 		DayDeck:             createDayDeck(),
 		NightDeck:           createNightDeck(),
 		Turn:                Morning,
@@ -75,15 +88,16 @@ func CreateNewGame(playerNames ...string) (*GameState, error) {
 		g.Players = append(g.Players, createPlayer(g, name, len(playerNames), i))
 	}
 	if err := g.assertNewGame(); err != nil {
-		return nil, err
+		return GameView{}, err
 	}
 
-	return g, nil
+	return NewGameView(g), nil
 }
 
-// DebugEventsOnTop puts Blood Moon and Winter Solstice as the first 2 cards,
-// then other events, then zombies.
-func (g *GameState) DebugEventsOnTop() {
+// DebugEventsOnTop reorders the night deck for testing purposes.
+// Places Blood Moon first, Winter Solstice second, then other events, then zombies.
+// This allows predictable testing of event handling.
+func (g *gameState) DebugEventsOnTop() {
 	// Find Blood Moon and Winter Solstice specifically
 	var bloodMoon, winterSolstice NightCard
 	otherEvents := make([]NightCard, 0)
@@ -108,8 +122,9 @@ func (g *GameState) DebugEventsOnTop() {
 	g.NightDeck = append(g.NightDeck, zombies...)
 }
 
-// creates new player with a fresh 5 card hand
-func createPlayer(g *GameState, name string, numPlayers int, playerIdx int) *Player {
+// createPlayer creates a new player with starting lives and a 5-card hand.
+// The player's name may be colored with ANSI codes if CLI mode is enabled.
+func createPlayer(g *gameState, name string, numPlayers int, playerIdx int) *Player {
 	// Apply color to player name if CLI mode
 	displayName := name
 	if cliMode {

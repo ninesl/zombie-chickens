@@ -2,7 +2,9 @@ package zcgame
 
 import "fmt"
 
-func (g *GameState) assertNewGame() error {
+// assertNewGame validates that a newly created game state is valid.
+// Returns a gameStateValidationError if any validation fails.
+func (g *gameState) assertNewGame() error {
 	var errs []error
 
 	// Validate Players slice
@@ -138,17 +140,18 @@ func (g *GameState) assertNewGame() error {
 	}
 
 	if len(errs) > 0 {
-		return &GameStateValidationError{Errors: errs}
+		return &gameStateValidationError{Errors: errs}
 	}
 	return nil
 }
 
-// GameStateValidationError wraps multiple game state validation errors
-type GameStateValidationError struct {
+// gameStateValidationError wraps multiple validation errors from assertNewGame.
+// It implements the error interface and formats all errors in its Error() output.
+type gameStateValidationError struct {
 	Errors []error
 }
 
-func (e *GameStateValidationError) Error() string {
+func (e *gameStateValidationError) Error() string {
 	if len(e.Errors) == 0 {
 		return "no game state validation errors"
 	}
@@ -163,7 +166,8 @@ func (e *GameStateValidationError) Error() string {
 	return msg
 }
 
-// StackValidationError wraps multiple stack validation errors
+// StackValidationError wraps multiple validation errors from assertLegalStacks.
+// It implements the error interface and formats all errors in its Error() output.
 type StackValidationError struct {
 	Errors []error
 }
@@ -183,7 +187,16 @@ func (e *StackValidationError) Error() string {
 	return msg
 }
 
-// assertLegalStacks validates that all stacks in the farm follow legal stacking rules
+// assertLegalStacks validates that all stacks in the farm follow legal stacking rules.
+// Returns a StackValidationError if any stack violates the rules.
+//
+// Legal stack configurations:
+//   - HayBale: 1-3 HayBales alone (3 forms a Hay Wall)
+//   - Scarecrow, BoobyTrap, Shield, WOLR: exactly 1, alone
+//   - Shotgun: 1 Shotgun, optionally with any number of Ammo
+//   - Ammo: any number alone, or with exactly 1 Shotgun
+//   - Flamethrower: 1 Flamethrower, optionally with 1 Fuel
+//   - Fuel: 1 Fuel alone, or with exactly 1 Flamethrower
 func (f *Farm) assertLegalStacks() error {
 	var errs []error
 
@@ -212,7 +225,8 @@ func (f *Farm) assertLegalStacks() error {
 	return nil
 }
 
-// validateStack checks if a single stack follows legal stacking rules
+// validateStack checks if a single stack follows legal stacking rules.
+// The counts map contains the count of each FarmItemType in the stack.
 func validateStack(index int, counts map[FarmItemType]int) error {
 	// Determine what items are in the stack
 	numTypes := len(counts)

@@ -14,15 +14,17 @@ import (
 // Default is false (API mode). Use SetCLIMode(true) before creating a game for CLI usage.
 var cliMode = false
 
-// SetCLIMode sets whether CLI mode is enabled.
-// When true, ANSI escape codes are used for colored output.
-// When false (default), plain text output is used for API/frontend consumption.
+// SetCLIMode enables or disables CLI mode for the package.
+// When enabled, String() methods include ANSI escape codes for colored terminal output.
+// When disabled (default), plain text is output for API/frontend consumption.
+//
 // This should be called once at startup before creating any games.
+// Changing this value mid-game may cause inconsistent output formatting.
 func SetCLIMode(enabled bool) {
 	cliMode = enabled
 }
 
-// IsCLIMode returns whether CLI mode is currently enabled.
+// IsCLIMode returns true if CLI mode is currently enabled.
 func IsCLIMode() bool {
 	return cliMode
 }
@@ -84,8 +86,11 @@ func clearScreen() {
 	}
 }
 
-// RefreshRender clears screen and prints game state
-func RefreshRender(g *GameState) {
+// RefreshRender clears the terminal and prints the current game state.
+// It sorts all players' hands and stacks before rendering for consistent display.
+// This is the standard render used during day turns.
+func RefreshRender(v GameView) {
+	g := v.game
 
 	for _, p := range g.Players {
 		p.Hand.Sort()
@@ -102,7 +107,8 @@ func RefreshRender(g *GameState) {
 
 // refreshRenderForDiscard renders the game state with farm item indices shown and hand indices hidden.
 // Used during Lightning Storm and Tornado events.
-func refreshRenderForDiscard(g *GameState) {
+func refreshRenderForDiscard(v GameView) {
+	g := v.game
 	clearScreen()
 	fmt.Printf("%s\n", g.StatsString())
 	fmt.Printf("%s %d\n%s\n---\n", g.Turn, g.NightNum, g.PublicDayCards)
@@ -122,7 +128,8 @@ func refreshRenderForDiscard(g *GameState) {
 
 // refreshRenderForNight renders the game state with farm stack indices shown and hand indices hidden.
 // Used during zombie attacks at night.
-func refreshRenderForNight(g *GameState) {
+func refreshRenderForNight(v GameView) {
+	g := v.game
 	clearScreen()
 	fmt.Printf("%s\n", g.StatsString())
 	fmt.Printf("%s %d\n%s\n---\n", g.Turn, g.NightNum, g.PublicDayCards)
@@ -140,9 +147,18 @@ func refreshRenderForNight(g *GameState) {
 	}
 }
 
-// GatherCLIInput displays the prompt and gathers input from the user via CLI.
-// This should only be called in CLI mode.
-func GatherCLIInput(g *GameState, inputNeeded *PlayerInputNeeded) int {
+// GatherCLIInput displays the game state and prompt, then reads player input from stdin.
+// It validates input against ValidChoices and re-prompts on invalid input.
+//
+// This function should only be called when CLI mode is enabled.
+// It will log.Fatal if called when cliMode is false.
+//
+// The render type from inputNeeded determines how the game state is displayed:
+//   - RenderNormal: Standard view with hand indices
+//   - RenderForDiscard: Farm item indices shown for event discards
+//   - RenderForNight: Stack indices shown for defense selection
+//   - RenderNone: No render, just the prompt
+func GatherCLIInput(v GameView, inputNeeded *PlayerInputNeeded) int {
 	if !cliMode {
 		log.Fatalf("tried to get CLI input but cliMode is %v", cliMode)
 	}
@@ -150,11 +166,11 @@ func GatherCLIInput(g *GameState, inputNeeded *PlayerInputNeeded) int {
 	// Render the appropriate game state
 	switch inputNeeded.RenderType {
 	case RenderNormal:
-		RefreshRender(g)
+		RefreshRender(v)
 	case RenderForDiscard:
-		refreshRenderForDiscard(g)
+		refreshRenderForDiscard(v)
 	case RenderForNight:
-		refreshRenderForNight(g)
+		refreshRenderForNight(v)
 	case RenderNone:
 		// No render
 	}

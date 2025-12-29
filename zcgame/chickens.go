@@ -1,91 +1,93 @@
 package zcgame
 
-var (
-	ZombieChickens = map[int]ZombieChicken{
-		1: {
-			Name:      "Raider",
-			NumInDeck: 2,
-			Traits:    []ZombieTrait{Flying, Bulletproof},
-		},
-		2: {
-			Name:      "Walker",
-			NumInDeck: 4,
-			Traits:    []ZombieTrait{Fireproof, Exploding},
-		},
-		3: {
-			Name:      "Chomper",
-			NumInDeck: 2,
-			Traits:    []ZombieTrait{Bulletproof, Fireproof, Timid},
-		},
-		4: {
-			Name:      "Crawler",
-			NumInDeck: 2,
-			Traits:    []ZombieTrait{Climbing, Bulletproof},
-		},
-		5: {
-			Name:      "Climber",
-			NumInDeck: 2,
-			Traits:    []ZombieTrait{Climbing, Fireproof, Exploding},
-		},
-		6: {
-			Name:      "Clucker",
-			NumInDeck: 2,
-			Traits:    []ZombieTrait{Exploding},
-		},
-		7: {
-			Name:      "Kablooey",
-			NumInDeck: 4,
-			Traits:    []ZombieTrait{Flying, Exploding},
-		},
-		8: {
-			Name:      "Biter",
-			NumInDeck: 10,
-			Traits:    []ZombieTrait{Flying, Fireproof},
-		},
-		9: {
-			Name:      "Blaster",
-			NumInDeck: 2,
-			Traits:    []ZombieTrait{Flying, Timid, Exploding},
-		},
-		10: {
-			Name:      "Boomer",
-			NumInDeck: 6,
-			Traits:    []ZombieTrait{Flying, Bulletproof, Exploding},
-		},
-		11: {
-			Name:      "Stalker",
-			NumInDeck: 4,
-			Traits:    []ZombieTrait{Invisible, Exploding},
-		},
-		12: {
-			Name:      "Thunder",
-			NumInDeck: 2,
-			Traits:    []ZombieTrait{Invisible, Flying, Timid, Exploding},
-		},
-		13: {
-			Name:      "Floater",
-			NumInDeck: 2,
-			Traits:    []ZombieTrait{Invisible, Flying, Timid},
-		},
-		14: {
-			Name:      "Toaster",
-			NumInDeck: 2,
-			Traits:    []ZombieTrait{Flying, Fireproof, Timid, Exploding},
-		},
-		15: {
-			Name:      "Sneaker",
-			NumInDeck: 2,
-			Traits:    []ZombieTrait{Invisible, Climbing},
-		},
-		16: {
-			Name:      "Creeper",
-			NumInDeck: 6,
-			Traits:    []ZombieTrait{Invisible},
-		},
-	}
-)
+// ZombieChickens contains all zombie types that can appear in the night deck.
+// Each zombie has a unique combination of traits that determine which defenses
+// are effective against it. The map key is used as ZombieKey in NightCard.
+var ZombieChickens = map[int]ZombieChicken{
+	1: {
+		Name:      "Raider",
+		NumInDeck: 2,
+		Traits:    []ZombieTrait{Flying, Bulletproof},
+	},
+	2: {
+		Name:      "Walker",
+		NumInDeck: 4,
+		Traits:    []ZombieTrait{Fireproof, Exploding},
+	},
+	3: {
+		Name:      "Chomper",
+		NumInDeck: 2,
+		Traits:    []ZombieTrait{Bulletproof, Fireproof, Timid},
+	},
+	4: {
+		Name:      "Crawler",
+		NumInDeck: 2,
+		Traits:    []ZombieTrait{Climbing, Bulletproof},
+	},
+	5: {
+		Name:      "Climber",
+		NumInDeck: 2,
+		Traits:    []ZombieTrait{Climbing, Fireproof, Exploding},
+	},
+	6: {
+		Name:      "Clucker",
+		NumInDeck: 2,
+		Traits:    []ZombieTrait{Exploding},
+	},
+	7: {
+		Name:      "Kablooey",
+		NumInDeck: 4,
+		Traits:    []ZombieTrait{Flying, Exploding},
+	},
+	8: {
+		Name:      "Biter",
+		NumInDeck: 10,
+		Traits:    []ZombieTrait{Flying, Fireproof},
+	},
+	9: {
+		Name:      "Blaster",
+		NumInDeck: 2,
+		Traits:    []ZombieTrait{Flying, Timid, Exploding},
+	},
+	10: {
+		Name:      "Boomer",
+		NumInDeck: 6,
+		Traits:    []ZombieTrait{Flying, Bulletproof, Exploding},
+	},
+	11: {
+		Name:      "Stalker",
+		NumInDeck: 4,
+		Traits:    []ZombieTrait{Invisible, Exploding},
+	},
+	12: {
+		Name:      "Thunder",
+		NumInDeck: 2,
+		Traits:    []ZombieTrait{Invisible, Flying, Timid, Exploding},
+	},
+	13: {
+		Name:      "Floater",
+		NumInDeck: 2,
+		Traits:    []ZombieTrait{Invisible, Flying, Timid},
+	},
+	14: {
+		Name:      "Toaster",
+		NumInDeck: 2,
+		Traits:    []ZombieTrait{Flying, Fireproof, Timid, Exploding},
+	},
+	15: {
+		Name:      "Sneaker",
+		NumInDeck: 2,
+		Traits:    []ZombieTrait{Invisible, Climbing},
+	},
+	16: {
+		Name:      "Creeper",
+		NumInDeck: 6,
+		Traits:    []ZombieTrait{Invisible},
+	},
+}
 
 // FindStacksThatCanKill returns indices of all stacks that can defeat the given zombie.
+// It checks each stack against the zombie's traits to determine effectiveness.
 func (f *Farm) FindStacksThatCanKill(zc ZombieChicken) []int {
 	result := []int{}
 	zt := zc.Traits
@@ -131,7 +133,7 @@ func (f *Farm) FindStacksThatCanKill(zc ZombieChicken) []int {
 	return result
 }
 
-// HasTrait returns true if the zombie has the specified trait.
+// HasTrait returns true if the trait slice contains the specified trait.
 func (zt ZombieTraits) HasTrait(trait ZombieTrait) bool {
 	for _, t := range zt {
 		if t == trait {
@@ -142,7 +144,13 @@ func (zt ZombieTraits) HasTrait(trait ZombieTrait) bool {
 }
 
 // FindStacksThatCanKillForFree returns indices of stacks that can defeat the zombie
-// without consuming any items. Excludes one-time-use items and Exploding zombies.
+// without consuming any items. This is used for automatic defense selection.
+//
+// A defense is "free" if:
+//   - The zombie is not Exploding (which destroys the stack)
+//   - The stack does not contain one-time-use items (BoobyTrap, WOLR, Ammo)
+//
+// Free defenses include: Scarecrow (vs Timid), Hay Wall, Flamethrower+Fuel.
 func (f *Farm) FindStacksThatCanKillForFree(zc ZombieChicken) []int {
 	// Exploding zombies are never free - they destroy the stack
 	if zc.Traits.HasTrait(Exploding) {
@@ -168,8 +176,12 @@ func (f *Farm) FindStacksThatCanKillForFree(zc ZombieChicken) []int {
 }
 
 // UseDefenseStack uses the defense at the given stack index to defeat a zombie.
-// If useShield is true, a shield is consumed to protect the stack from an exploding zombie.
-func (f *Farm) UseDefenseStack(stackIdx int, zc ZombieChicken, useShield bool, g *GameState) {
+// This handles all the side effects of using a defense:
+//   - WOLR destroys the entire farm
+//   - Exploding zombies destroy the stack (unless useShield is true)
+//   - One-time-use items (Ammo, BoobyTrap) are discarded
+//   - Shield is consumed if useShield is true
+func (f *Farm) UseDefenseStack(stackIdx int, zc ZombieChicken, useShield bool, g *gameState) {
 	stack := f.Stacks[stackIdx]
 
 	// WOLR destroys everything on the farm - handle first since it overrides all other logic

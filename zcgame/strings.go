@@ -1,10 +1,17 @@
 package zcgame
 
+// This file contains Stringer implementations for all game types.
+// Output format depends on cliMode:
+//   - CLI mode (true): ANSI escape codes for colored terminal output
+//   - API mode (false): Plain text suitable for JSON serialization
+
 import (
 	"fmt"
 	"log"
 )
 
+// String returns the display name for a FarmItemType.
+// One-time-use items are marked with an asterisk (*).
 func (f FarmItemType) String() string {
 	if cliMode {
 		switch f {
@@ -130,6 +137,7 @@ func (zt ZombieTrait) String() string {
 	}
 }
 
+// intSliceChoices formats a slice of integers for display as valid choices.
 func intSliceChoices(s ...int) string {
 	return fmt.Sprintf("%+v", s)
 }
@@ -165,7 +173,7 @@ func (s StageInTurn) String() string {
 	}
 }
 
-func (g *GameState) String() string {
+func (g *gameState) String() string {
 	result := fmt.Sprintf("%s %d\n%s\n---\n", g.Turn, g.NightNum, g.PublicDayCards)
 	for i, player := range g.Players {
 		isCurrentPlayer := i == g.CurrentPlayerIdx
@@ -324,6 +332,7 @@ func (s Stacks) stringWithIndices(showIndices bool) string {
 }
 
 // TotalItems returns the total number of items across all stacks.
+// Used to determine how many cards a player must discard during events.
 func (s Stacks) TotalItems() int {
 	count := 0
 	for _, stack := range s {
@@ -422,7 +431,8 @@ func (s Stack) stringWithIndices(idx *int) string {
 	return result
 }
 
-func (g *GameState) StatsString() string {
+// StatsString returns a summary of game statistics (zombies killed, events played, etc.).
+func (g *gameState) StatsString() string {
 	zombiesKilled := 0
 	eventsPlayed := 0
 	for _, card := range g.DiscardedNightCards {

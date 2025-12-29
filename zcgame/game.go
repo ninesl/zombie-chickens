@@ -8,6 +8,8 @@ package zcgame
 // Public API:
 //   - ContinueDay() - Main entry point to advance game state
 //   - ContinueAfterInput() - Resume execution after player provides input
+//   - CurrentPlayer() - Returns the player whose turn it is
+//   - HasLivingPlayers() - Checks if any players remain alive
 //
 // Internal functions (lowercase prefix indicates state machine internals):
 //   - doPlayerDayTurn() - Processes one player's day turn
@@ -24,11 +26,13 @@ import (
 	"fmt"
 )
 
-func (g *GameState) CurrentPlayer() *Player {
+// CurrentPlayer returns a pointer to the player whose turn it is.
+func (g *gameState) CurrentPlayer() *Player {
 	return g.Players[g.CurrentPlayerIdx]
 }
 
-func (g *GameState) nextPlayer() {
+// nextPlayer advances CurrentPlayerIdx to the next player, wrapping to 0 if needed.
+func (g *gameState) nextPlayer() {
 	g.CurrentPlayerIdx++
 	if g.CurrentPlayerIdx >= len(g.Players) {
 		g.CurrentPlayerIdx = 0
@@ -36,7 +40,7 @@ func (g *GameState) nextPlayer() {
 }
 
 // eliminatePlayer discards all of a player's cards and removes them from the game.
-func (g *GameState) eliminatePlayer(player *Player) {
+func (g *gameState) eliminatePlayer(player *Player) {
 	// Find the player's index
 	playerIdx := -1
 	for i, p := range g.Players {
@@ -85,7 +89,7 @@ func (g *GameState) eliminatePlayer(player *Player) {
 // doPlayerDayTurn processes one player's day turn using a state machine pattern.
 // Returns nil when the turn is complete, or *PlayerInputNeeded when input is required.
 // This is an internal function - external callers should use ContinueDay/ContinueAfterInput.
-func (g *GameState) doPlayerDayTurn() *PlayerInputNeeded {
+func (g *gameState) doPlayerDayTurn() *PlayerInputNeeded {
 	player := g.CurrentPlayer()
 
 	for {
@@ -143,7 +147,7 @@ func (g *GameState) doPlayerDayTurn() *PlayerInputNeeded {
 }
 
 // createStackSelectionInput creates the input request for stack selection during card play
-func (g *GameState) createStackSelectionInput() *PlayerInputNeeded {
+func (g *gameState) createStackSelectionInput() *PlayerInputNeeded {
 	player := g.CurrentPlayer()
 
 	// Get valid stacks from PlayCard
@@ -172,7 +176,7 @@ func (g *GameState) createStackSelectionInput() *PlayerInputNeeded {
 
 // provideInput provides the player's input and continues game execution.
 // Returns nil when the current operation is complete, or *PlayerInputNeeded if more input is needed.
-func (g *GameState) provideInput(choice int) *PlayerInputNeeded {
+func (g *gameState) provideInput(choice int) *PlayerInputNeeded {
 	switch g.Turn {
 	case Morning, Afternoon:
 		return g.provideDayInput(choice)
@@ -183,7 +187,7 @@ func (g *GameState) provideInput(choice int) *PlayerInputNeeded {
 }
 
 // provideDayInput handles input during day turns
-func (g *GameState) provideDayInput(choice int) *PlayerInputNeeded {
+func (g *gameState) provideDayInput(choice int) *PlayerInputNeeded {
 	player := g.CurrentPlayer()
 
 	switch g.DaySubStage {
@@ -283,7 +287,7 @@ func (g *GameState) provideDayInput(choice int) *PlayerInputNeeded {
 // doNightTurn processes the night phase using a state machine pattern.
 // Returns nil when complete, or *PlayerInputNeeded when input is required.
 // This is an internal function - external callers should use ContinueDay/ContinueAfterInput.
-func (g *GameState) doNightTurn() *PlayerInputNeeded {
+func (g *gameState) doNightTurn() *PlayerInputNeeded {
 	g.StageInTurn = Nighttime
 
 	// Deal night cards once at the start of night
@@ -303,7 +307,7 @@ func (g *GameState) doNightTurn() *PlayerInputNeeded {
 }
 
 // processNightCards continues processing night cards
-func (g *GameState) processNightCards() *PlayerInputNeeded {
+func (g *gameState) processNightCards() *PlayerInputNeeded {
 	for {
 		if len(g.Players) == 0 {
 			g.resetNightState()
@@ -410,7 +414,7 @@ func (g *GameState) processNightCards() *PlayerInputNeeded {
 // processEventCard handles an event card
 // startEventDiscard initializes the event discard state and returns input request if needed.
 // Called from event Action functions for Lightning Storm and Tornado.
-func (g *GameState) startEventDiscard(n int) *PlayerInputNeeded {
+func (g *gameState) startEventDiscard(n int) *PlayerInputNeeded {
 	g.EventDiscardTotal = n
 	g.EventDiscardRemaining = n
 	g.EventDiscardStartIdx = g.CurrentPlayerIdx // Start from player who drew the event
@@ -419,7 +423,7 @@ func (g *GameState) startEventDiscard(n int) *PlayerInputNeeded {
 	return g.createEventDiscardInput()
 }
 
-func (g *GameState) processEventCard(nightCard NightCard) *PlayerInputNeeded {
+func (g *gameState) processEventCard(nightCard NightCard) *PlayerInputNeeded {
 	// Save event info for confirmation display
 	g.PendingEventName = nightCard.Event.Name
 	g.PendingEventDesc = nightCard.Event.Description
@@ -430,7 +434,7 @@ func (g *GameState) processEventCard(nightCard NightCard) *PlayerInputNeeded {
 }
 
 // createEventDiscardInput creates input request for event-based discards
-func (g *GameState) createEventDiscardInput() *PlayerInputNeeded {
+func (g *gameState) createEventDiscardInput() *PlayerInputNeeded {
 	// Find the player who needs to discard
 	// Players are processed starting from EventDiscardStartIdx and cycling through
 	for g.EventDiscardPlayerIdx < len(g.Players) {
@@ -491,7 +495,7 @@ func (g *GameState) createEventDiscardInput() *PlayerInputNeeded {
 }
 
 // processZombieCard handles a zombie attack
-func (g *GameState) processZombieCard(nightCard NightCard) *PlayerInputNeeded {
+func (g *gameState) processZombieCard(nightCard NightCard) *PlayerInputNeeded {
 	player := g.CurrentPlayer()
 	zc := ZombieChickens[nightCard.ZombieKey]
 	g.CurrentZombie = &zc
@@ -518,7 +522,7 @@ func (g *GameState) processZombieCard(nightCard NightCard) *PlayerInputNeeded {
 }
 
 // createDefenseChoiceInput creates the input request for defense stack selection
-func (g *GameState) createDefenseChoiceInput() *PlayerInputNeeded {
+func (g *gameState) createDefenseChoiceInput() *PlayerInputNeeded {
 	player := g.CurrentPlayer()
 	zc := *g.CurrentZombie
 	allStacks := player.Farm.FindStacksThatCanKill(zc)
@@ -540,7 +544,7 @@ func (g *GameState) createDefenseChoiceInput() *PlayerInputNeeded {
 }
 
 // provideNightInput handles input during night phase
-func (g *GameState) provideNightInput(choice int) *PlayerInputNeeded {
+func (g *gameState) provideNightInput(choice int) *PlayerInputNeeded {
 	player := g.CurrentPlayer()
 
 	switch g.NightSubStage {
@@ -706,7 +710,7 @@ func (g *GameState) provideNightInput(choice int) *PlayerInputNeeded {
 }
 
 // resetNightState resets night processing state (but NOT NightCardsDealt - that's reset on transition to night)
-func (g *GameState) resetNightState() {
+func (g *gameState) resetNightState() {
 	// NOTE: Do NOT reset NightCardsDealt here - it must persist until we actually transition
 	// to the next day. Otherwise cards get re-dealt when DoDay() calls DoNightTurn() after
 	// ContinueAfterInput finishes processing.
@@ -723,11 +727,30 @@ func (g *GameState) resetNightState() {
 	g.EventDiscardTotal = 0
 }
 
-// ContinueDay runs a full day cycle.
-// Returns (true, nil) if the day completed and game continues.
-// Returns (false, nil) if game over.
-// Returns (bool, *PlayerInputNeeded) if input is needed.
-func (g *GameState) ContinueDay() (bool, *PlayerInputNeeded) {
+// ContinueDay advances the game state through the current day cycle.
+// This is the main entry point for driving the game forward.
+//
+// Returns:
+//   - (true, nil): Day completed successfully, game continues to next day
+//   - (false, nil): Game over (no players remaining)
+//   - (_, *PlayerInputNeeded): Player input required; call ContinueAfterInput with the choice
+//
+// The game progresses through Morning, Afternoon, and Night phases.
+// Each phase may require multiple calls if player input is needed.
+//
+// Example usage:
+//
+//	for {
+//	    gameOver, inputNeeded := game.ContinueDay()
+//	    if inputNeeded != nil {
+//	        choice := gatherInput(inputNeeded)
+//	        gameOver, inputNeeded = game.ContinueAfterInput(choice)
+//	    }
+//	    if !gameOver {
+//	        break // Game ended
+//	    }
+//	}
+func (g *gameState) ContinueDay() (bool, *PlayerInputNeeded) {
 	if len(g.Players) == 0 {
 		return false, nil
 	}
@@ -780,11 +803,23 @@ func (g *GameState) ContinueDay() (bool, *PlayerInputNeeded) {
 	return true, nil
 }
 
-// ContinueAfterInput resumes game execution after player provides input.
-// Returns (true, nil) if the day completed and game continues.
-// Returns (false, nil) if game over.
-// Returns (<bool>, *PlayerInputNeeded) if input is needed.
-func (g *GameState) ContinueAfterInput(choice int) (bool, *PlayerInputNeeded) {
+// ContinueAfterInput resumes game execution after the player provides input.
+// The choice parameter should be one of the ValidChoices from the PlayerInputNeeded
+// that was returned by ContinueDay or a previous ContinueAfterInput call.
+//
+// Returns:
+//   - (true, nil): Current operation completed, game continues
+//   - (false, nil): Game over (no players remaining)
+//   - (_, *PlayerInputNeeded): More input required; call again with the new choice
+//
+// Example:
+//
+//	gameOver, inputNeeded := game.ContinueDay()
+//	for inputNeeded != nil {
+//	    choice := gatherInput(inputNeeded)
+//	    gameOver, inputNeeded = game.ContinueAfterInput(choice)
+//	}
+func (g *gameState) ContinueAfterInput(choice int) (bool, *PlayerInputNeeded) {
 	inputNeeded := g.provideInput(choice)
 	if inputNeeded != nil {
 		return false, inputNeeded
@@ -794,7 +829,10 @@ func (g *GameState) ContinueAfterInput(choice int) (bool, *PlayerInputNeeded) {
 	return g.ContinueDay()
 }
 
-func (g *GameState) HasLivingPlayers() bool {
+// HasLivingPlayers returns true if at least one player has lives remaining.
+// Note that eliminated players are removed from the Players slice, so this
+// is equivalent to checking len(g.Players) > 0 in most cases.
+func (g *gameState) HasLivingPlayers() bool {
 	for _, player := range g.Players {
 		if player.Lives > 0 {
 			return true

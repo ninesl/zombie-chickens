@@ -1,7 +1,8 @@
 package zcgame
 
-// pops the first element of g.DayDeck, refills and shuffles when g.DayDeck <= 1
-func (g *GameState) nextDayCard() FarmItemType {
+// nextDayCard draws and returns the top card from the day deck.
+// If the deck is empty or has only one card, it refills from the discard pile.
+func (g *gameState) nextDayCard() FarmItemType {
 	if len(g.DayDeck) == 0 {
 		g.refillDayCards()
 	} else if len(g.DayDeck) == 1 {
@@ -17,11 +18,13 @@ func (g *GameState) nextDayCard() FarmItemType {
 	return card
 }
 
-func (g *GameState) discardDayCard(item FarmItemType) {
+// discardDayCard adds a card to the day discard pile.
+func (g *gameState) discardDayCard(item FarmItemType) {
 	g.DiscardedDayCards[item]++
 }
 
-func (g *GameState) refillDayCards() {
+// refillDayCards moves all discarded day cards back into the deck and shuffles.
+func (g *gameState) refillDayCards() {
 	for farmItem, amount := range g.DiscardedDayCards {
 		for range amount {
 			g.DayDeck = append(g.DayDeck, farmItem)
@@ -33,7 +36,9 @@ func (g *GameState) refillDayCards() {
 	g.DiscardedDayCards = map[FarmItemType]int{} // clear
 }
 
-func (g *GameState) nextNightCard() NightCard {
+// nextNightCard draws and returns the top card from the night deck.
+// If the deck is empty, it refills from the discard pile and shuffles.
+func (g *gameState) nextNightCard() NightCard {
 	if len(g.NightDeck) == 0 {
 		g.NightDeck = g.DiscardedNightCards
 		shuffle(g.NightDeck)
@@ -45,7 +50,8 @@ func (g *GameState) nextNightCard() NightCard {
 	return nightCard
 }
 
-func (g *GameState) discardNightCard(n NightCard) {
+// discardNightCard adds a night card to the discard pile.
+func (g *gameState) discardNightCard(n NightCard) {
 	if g.DiscardedNightCards == nil {
 		g.DiscardedNightCards = make([]NightCard, 0)
 	}

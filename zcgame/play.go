@@ -1,6 +1,6 @@
 package zcgame
 
-// countItemInStack returns how many times item appears in stack
+// countItemInStack returns the count of a specific item type within a stack.
 func countItemInStack(stack Stack, item FarmItemType) int {
 	count := 0
 	for _, card := range stack {
@@ -11,9 +11,13 @@ func countItemInStack(stack Stack, item FarmItemType) int {
 	return count
 }
 
-// findStacks returns indices of all stacks containing ALL of the specified items
-// Example: findStacks(Stack{Shotgun}) finds all stacks with at least 1 Shotgun
-// Example: findStacks(Stack{Shotgun, Ammo}) finds all stacks with both Shotgun AND Ammo
+// findStacks returns indices of all stacks containing ALL of the specified items.
+// This is used to find valid placement targets for cards.
+//
+// Examples:
+//
+//	findStacks(Stack{Shotgun})       // finds stacks with at least 1 Shotgun
+//	findStacks(Stack{Shotgun, Ammo}) // finds stacks with both Shotgun AND Ammo
 func (f *Farm) findStacks(items Stack) []int {
 	result := []int{}
 	for i, stack := range f.Stacks {
@@ -31,6 +35,13 @@ func (f *Farm) findStacks(items Stack) []int {
 	return result
 }
 
+// PlayCard attempts to play a card to the farm, following stacking rules.
+// Returns nil if the card was placed automatically, or a PlayCardResult
+// containing valid stack choices if player input is needed.
+//
+// The function handles automatic placement based on PlayerPlayChoices settings
+// and game rules. For example, Fuel is automatically placed on an unpaired
+// Flamethrower if one exists.
 func (f *Farm) PlayCard(item FarmItemType, choices PlayerPlayChoices) *PlayCardResult {
 	if f.Stacks == nil {
 		f.Stacks = make([]Stack, 0)
@@ -214,41 +225,44 @@ func (f *Farm) PlayCard(item FarmItemType, choices PlayerPlayChoices) *PlayCardR
 	return nil
 }
 
+// makeStackWith creates a new stack containing the given item and adds it to the farm.
 func (f *Farm) makeStackWith(item FarmItemType) {
 	var stack = make(Stack, 0, 1)
 	stack = append(stack, item)
 	f.Stacks = append(f.Stacks, stack)
 }
 
-// PlayCardResult is returned when PlayCard needs player input to decide
-// where to place a card. A nil result means the card was played successfully.
+// PlayCardResult is returned by PlayCard when player input is needed to decide
+// where to place a card. A nil result means the card was placed automatically.
 type PlayCardResult struct {
-	ValidStacks []int  // valid stack indices the player can choose from
-	Message     string // human-readable prompt
+	ValidStacks []int  // Valid stack indices (0-based) the player can choose from
+	Message     string // Human-readable prompt describing the choice
 }
 
-// InputContext specifies what type of input is being requested
+// InputContext specifies what type of input is being requested.
+// This helps the UI/frontend understand what kind of choice the player is making.
 type InputContext uint8
 
 const (
-	InputContextPlayCard     InputContext = iota // Choosing where to play a card (stack selection)
-	InputContextDiscard                          // Optional discard phase
-	InputContextPlay                             // Play card from hand phase
-	InputContextDraw                             // Draw cards phase (public vs deck)
-	InputContextDefense                          // Night: choose defense stack
-	InputContextShield                           // Night: use shield for exploding zombie?
-	InputContextConfirm                          // Press 0 to continue
-	InputContextEventDiscard                     // Discard cards during event (Lightning Storm, Tornado)
+	InputContextPlayCard     InputContext = iota // Choosing which stack to place a card on
+	InputContextDiscard                          // Optional discard phase (discard to draw)
+	InputContextPlay                             // Selecting a card from hand to play
+	InputContextDraw                             // Choosing public cards vs deck draw
+	InputContextDefense                          // Night: selecting which stack to use against zombie
+	InputContextShield                           // Night: deciding whether to use Shield
+	InputContextConfirm                          // Confirmation prompt (press 0 to continue)
+	InputContextEventDiscard                     // Selecting cards to discard during an event
 )
 
-// RenderType specifies which render function to use
+// RenderType specifies which rendering mode to use when displaying the game state.
+// Different phases require different information to be visible.
 type RenderType uint8
 
 const (
-	RenderNormal RenderType = iota
-	RenderForDiscard
-	RenderForNight
-	RenderNone
+	RenderNormal     RenderType = iota // Standard view with hand indices
+	RenderForDiscard                   // Farm item indices shown for event discards
+	RenderForNight                     // Stack indices shown for defense selection
+	RenderNone                         // No render needed
 )
 
 // PlayerInputNeeded signals that the game state machine requires player input to continue.
@@ -292,6 +306,7 @@ func (f *Farm) addToStackIndex(item FarmItemType, stackIndex int) {
 	f.Stacks[stackIndex] = append(f.Stacks[stackIndex], item)
 }
 
+// HasItem returns true if the stack contains at least one of the specified item type.
 func (s Stack) HasItem(item FarmItemType) bool {
 	for _, card := range s {
 		if card == item {
@@ -311,7 +326,8 @@ func (f *Farm) HasItemInStacks(item FarmItemType) bool {
 	return false
 }
 
-// removes all Stacks from f.Stacks where len(f.Stacks[i]) == 0
+// clearStacks removes all empty stacks from the farm.
+// This is called after items are removed from stacks to clean up.
 func (f *Farm) clearStacks() {
 	for i := len(f.Stacks) - 1; i >= 0; i-- {
 		if len(f.Stacks[i]) == 0 {
