@@ -332,6 +332,64 @@ var (
 type Stack []FarmItemType
 type Stacks []Stack
 
+// Sort sorts items within each stack, removes empty stacks in-place,
+// then sorts stacks by their first element.
+func (s *Stacks) Sort() {
+	// Sort items within each stack
+	for i := range *s {
+		(*s)[i].Sort()
+	}
+
+	// Remove empty stacks in-place
+	writeIdx := 0
+	for i := range *s {
+		if len((*s)[i]) > 0 {
+			(*s)[writeIdx] = (*s)[i]
+			writeIdx++
+		}
+	}
+	*s = (*s)[:writeIdx]
+
+	// Sort stacks by first element (bubble sort)
+	for i := 0; i < len(*s); i++ {
+		for j := i + 1; j < len(*s); j++ {
+			if (*s)[i][0] > (*s)[j][0] {
+				(*s)[i], (*s)[j] = (*s)[j], (*s)[i]
+			}
+		}
+	}
+}
+
+// Sort sorts the stack items in-place by FarmItemType.
+func (s Stack) Sort() {
+	for i := 0; i < len(s); i++ {
+		for j := i + 1; j < len(s); j++ {
+			if s[i] > s[j] {
+				s[i], s[j] = s[j], s[i]
+			}
+		}
+	}
+}
+
+// Sort sorts the hand in-place by visible (true first), then by FarmItemType.
+// Called explicitly in game.go before accessing [3] and [4] slots.
+func (h *Hand) Sort() {
+	// Move NUM_FARM_ITEMS (blank slots) to the end, then sort by FarmItemType
+	for i := 0; i < len(h); i++ {
+		for j := i + 1; j < len(h); j++ {
+			// Blank slots go to end
+			if h[i].FarmItemType == NUM_FARM_ITEMS && h[j].FarmItemType != NUM_FARM_ITEMS {
+				h[i], h[j] = h[j], h[i]
+			} else if h[i].FarmItemType != NUM_FARM_ITEMS && h[j].FarmItemType != NUM_FARM_ITEMS {
+				// Both non-blank: sort by FarmItemType
+				if h[i].FarmItemType > h[j].FarmItemType {
+					h[i], h[j] = h[j], h[i]
+				}
+			}
+		}
+	}
+}
+
 func (s *Stack) RemoveItem(item FarmItemType) {
 	for i, card := range *s {
 		if card == item {

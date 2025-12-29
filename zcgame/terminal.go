@@ -89,9 +89,7 @@ func RefreshRender(g *GameState) {
 
 	for _, p := range g.Players {
 		p.Hand.Sort()
-		for i := range p.Farm.Stacks {
-			p.Farm.Stacks[i].Sort()
-		}
+		p.Farm.Stacks.Sort()
 	}
 
 	clearScreen()

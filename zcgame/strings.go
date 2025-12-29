@@ -387,25 +387,6 @@ func (h *Hand) stringWithIndices(showIndices bool) string {
 	return result
 }
 
-// Sort sorts the hand in-place by visible (true first), then by FarmItemType.
-// Called explicitly in game.go before accessing [3] and [4] slots.
-func (h *Hand) Sort() {
-	// Move NUM_FARM_ITEMS (blank slots) to the end, then sort by FarmItemType
-	for i := 0; i < len(h); i++ {
-		for j := i + 1; j < len(h); j++ {
-			// Blank slots go to end
-			if h[i].FarmItemType == NUM_FARM_ITEMS && h[j].FarmItemType != NUM_FARM_ITEMS {
-				h[i], h[j] = h[j], h[i]
-			} else if h[i].FarmItemType != NUM_FARM_ITEMS && h[j].FarmItemType != NUM_FARM_ITEMS {
-				// Both non-blank: sort by FarmItemType
-				if h[i].FarmItemType > h[j].FarmItemType {
-					h[i], h[j] = h[j], h[i]
-				}
-			}
-		}
-	}
-}
-
 func (s Stack) String() string {
 	// NOTE: Sorting commented out - order preserved as-is for frontend consistency
 	// sort.Slice(s, func(i, j int) bool {
