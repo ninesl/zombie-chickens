@@ -1,0 +1,61 @@
+package pages
+
+import (
+	"fmt"
+	"github.com/ninesl/zombie-chickens/webapp/router/endpoints"
+	"github.com/ninesl/zombie-chickens/webapp/state"
+	"github.com/ninesl/zombie-chickens/webapp/ui/layouts"
+)
+
+templ LobbyPage(session *state.GameSession, sessionID string, joined bool) {
+	@layouts.Base("Zombie Chickens - Lobby") {
+		<h1>Zombie Chickens</h1>
+		<div hx-ext="sse" sse-connect={ endpoints.LobbyConnect } sse-swap={ endpoints.SSEEventLobby } sse-reconnect="true">
+			@LobbyContent(session, sessionID, joined)
+		</div>
+	}
+}
+
+templ LobbyContent(session *state.GameSession, sessionID string, joined bool) {
+	<div id={ endpoints.IDLobbyContent }>
+	if session.IsStarted() {
+		<p>Game has started!</p>
+		<a href={ templ.SafeURL(endpoints.GamePage) }>Go to Game</a>
+	} else {
+		if !joined {
+			<div class="lobby-form">
+				<form hx-post={ endpoints.LobbyJoin } hx-swap="outerHTML" hx-target={ "#" + endpoints.IDLobbyContent }>
+					<input type="text" name={ endpoints.FieldPlayerName } placeholder="Enter your name" required maxlength="20"/>
+					<button type="submit">Join Game</button>
+				</form>
+			</div>
+		} else {
+			<p>You're in the lobby! Waiting for game to start...</p>
+		}
+		<div class="player-list">
+			<h3>Players ({ fmt.Sprint(session.PlayerCount()) }/4):</h3>
+			@PlayerList(session.Players())
+		</div>
+		if session.IsFirstPlayer(sessionID) && session.PlayerCount() >= 1 {
+			<form hx-post={ endpoints.LobbyStart } hx-swap="outerHTML" hx-target={ "#" + endpoints.IDLobbyContent }>
+				<button type="submit" class="choice-btn">Start Game</button>
+			</form>
+		}
+	}
+	</div>
+}
+
+templ PlayerList(players []state.PlayerInfo) {
+	for i, p := range players {
+		<div class="player-list-item">
+			{ intToStr(i + 1) }. { p.Name }
+		</div>
+	}
+	if len(players) == 0 {
+		<div class="player-list-item">No players yet...</div>
+	}
+}
+
+func intToStr(i int) string {
+	return fmt.Sprint(i)
+}

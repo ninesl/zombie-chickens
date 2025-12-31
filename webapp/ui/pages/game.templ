@@ -1,0 +1,22 @@
+package pages
+
+import (
+	"github.com/ninesl/zombie-chickens/webapp/router/endpoints"
+	"github.com/ninesl/zombie-chickens/webapp/ui/layouts"
+)
+
+templ GamePage() {
+	@layouts.Base("Zombie Chickens - Game") {
+		<h1>Zombie Chickens</h1>
+		<div 
+			hx-ext="sse" 
+			sse-connect={ endpoints.GameConnect } 
+			sse-swap={ endpoints.SSEEventGame }
+			sse-reconnect="true"
+		>
+			<div id={ endpoints.IDGameBoard }>
+				<p>Connecting to game...</p>
+			</div>
+		</div>
+	}
+}

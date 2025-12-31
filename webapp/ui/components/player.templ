@@ -1,0 +1,208 @@
+package components
+
+import (
+	"fmt"
+	"github.com/ninesl/zombie-chickens/zcgame"
+	"github.com/ninesl/zombie-chickens/webapp/router/endpoints"
+)
+
+templ PlayerCard(pv zcgame.PlayerView, playerIdx int, currentPlayerIdx int, activeInputPlayerIdx int, turn zcgame.Turn, pendingInput *zcgame.PlayerInputNeeded) {
+	// A player is "active" if they need to provide input (different from currentPlayer during events)
+	{{ isActiveInput := playerIdx == activeInputPlayerIdx }}
+	<div class={ "player-card", templ.KV("current", playerIdx == currentPlayerIdx), templ.KV("active-input", isActiveInput && pendingInput != nil) }>
+		<div class="player-header">
+			<span style={ playerColorStyle(playerIdx) }>{ pv.Name() }</span>
+			<span>{ fmt.Sprint(pv.Lives()) } HP</span>
+		</div>
+		if turn == zcgame.Night {
+			@NightCards(pv.NightCards(), playerIdx == currentPlayerIdx)
+		}
+		// Show input prompt above the farm (below zombie/event cards)
+		if isActiveInput && pendingInput != nil {
+			@InputPrompt(pendingInput, activeInputPlayerIdx)
+		}
+		@Farm(pv.Stacks(), pendingInput, isActiveInput, turn)
+		@Hand(pv.Hand(), pendingInput, isActiveInput)
+	</div>
+}
+
+templ Farm(stacks zcgame.Stacks, pendingInput *zcgame.PlayerInputNeeded, isCurrentPlayer bool, turn zcgame.Turn) {
+	<div class={ "farm", farmTurnClass(turn) }>
+		<div class="farm-label">Farm:</div>
+		<div class="stacks-container">
+			if len(stacks) == 0 && !showNewStackOption(pendingInput, isCurrentPlayer) {
+				<span class="farm-label">(empty)</span>
+			}
+			@StacksClickable(stacks, pendingInput, isCurrentPlayer)
+			// Show "NEW STACK" option when placing a card and choice 0 is valid
+			if showNewStackOption(pendingInput, isCurrentPlayer) {
+				@NewStackButton()
+			}
+		</div>
+	</div>
+}
+
+templ StacksClickable(stacks zcgame.Stacks, pendingInput *zcgame.PlayerInputNeeded, isCurrentPlayer bool) {
+	{{ renderMode := getRenderMode(pendingInput) }}
+	{{ itemIdx := 1 }}
+	for stackIdx, stack := range stacks {
+		{{ stackChoice := stackIdx + 1 }}
+		{{ isValidStack := isCurrentPlayer && isValidStackChoice(pendingInput, stackChoice) }}
+		
+		if renderMode == zcgame.RenderForNight && isValidStack {
+			// Night defense - whole stack is clickable
+			<form class="stack-form" hx-post={ endpoints.GameInput } hx-swap="none">
+				<input type="hidden" name={ endpoints.FieldChoice } value={ fmt.Sprint(stackChoice) }/>
+				<button type="submit" class="stack clickable">
+					@Stack(stack)
+				</button>
+			</form>
+		} else if renderMode == zcgame.RenderForDiscard && isCurrentPlayer {
+			// Discard mode - individual items are clickable
+			<div class="stack">
+				for _, item := range stack {
+					{{ choice := itemIdx }}
+					if isValidItemChoice(pendingInput, choice) {
+						<form class="item-form" hx-post={ endpoints.GameInput } hx-swap="none">
+							<input type="hidden" name={ endpoints.FieldChoice } value={ fmt.Sprint(choice) }/>
+							<button type="submit" class="farm-item-btn clickable">
+								@FarmItem(item)
+							</button>
+						</form>
+					} else {
+						@FarmItem(item)
+					}
+					{{ itemIdx++ }}
+				}
+			</div>
+		} else if renderMode == zcgame.RenderNormal && isValidStack {
+			// PlayCard context - choosing which stack to add to
+			<form class="stack-form" hx-post={ endpoints.GameInput } hx-swap="none">
+				<input type="hidden" name={ endpoints.FieldChoice } value={ fmt.Sprint(stackChoice) }/>
+				<button type="submit" class="stack clickable">
+					@Stack(stack)
+				</button>
+			</form>
+		} else {
+			// Not clickable
+			<div class="stack">
+				@Stack(stack)
+			</div>
+		}
+	}
+}
+
+templ Stack(stack zcgame.Stack) {
+	for _, item := range stack {
+		@FarmItem(item)
+	}
+}
+
+templ NewStackButton() {
+	<form class="stack-form" hx-post={ endpoints.GameInput } hx-swap="none">
+		<input type="hidden" name={ endpoints.FieldChoice } value="0"/>
+		<button type="submit" class="stack new-stack clickable">
+			<span class="new-stack-label">+ NEW STACK</span>
+		</button>
+	</form>
+}
+
+templ Hand(hand zcgame.Hand, pendingInput *zcgame.PlayerInputNeeded, isCurrentPlayer bool) {
+	<div class="hand">
+		{{ isPlayContext := isCurrentPlayer && pendingInput != nil && (pendingInput.Context == zcgame.InputContextPlay || pendingInput.Context == zcgame.InputContextDiscard) }}
+		{{ idx := 1 }}
+		for i, card := range hand {
+			if card.FarmItemType != zcgame.NUM_FARM_ITEMS {
+				{{ choice := idx }}
+				if isPlayContext && isValidItemChoice(pendingInput, choice) {
+					<form class="hand-form" hx-post={ endpoints.GameInput } hx-swap="none">
+						<input type="hidden" name={ endpoints.FieldChoice } value={ fmt.Sprint(choice) }/>
+						<button type="submit" class="hand-item clickable">
+							@FarmItem(card.FarmItemType)
+						</button>
+					</form>
+				} else {
+					<div class="hand-item">
+						@FarmItem(card.FarmItemType)
+					</div>
+				}
+				{{ idx++ }}
+			}
+			{{ _ = i }}
+		}
+	</div>
+}
+
+func getRenderMode(input *zcgame.PlayerInputNeeded) zcgame.RenderType {
+	if input == nil {
+		return zcgame.RenderNormal
+	}
+	return input.RenderType
+}
+
+func showNewStackOption(input *zcgame.PlayerInputNeeded, isCurrentPlayer bool) bool {
+	if !isCurrentPlayer || input == nil {
+		return false
+	}
+	if input.Context != zcgame.InputContextPlayCard {
+		return false
+	}
+	// Check if 0 (new stack) is a valid choice
+	for _, c := range input.ValidChoices {
+		if c == 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func isValidStackChoice(input *zcgame.PlayerInputNeeded, choice int) bool {
+	if input == nil {
+		return false
+	}
+	// For defense/playcard contexts, check ValidStacks
+	if input.Context == zcgame.InputContextDefense || input.Context == zcgame.InputContextPlayCard {
+		for _, v := range input.ValidStacks {
+			if v+1 == choice { // ValidStacks is 0-indexed, choices are 1-indexed
+				return true
+			}
+		}
+		// Also check ValidChoices as fallback
+		for _, v := range input.ValidChoices {
+			if v == choice {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isValidItemChoice(input *zcgame.PlayerInputNeeded, choice int) bool {
+	if input == nil {
+		return false
+	}
+	for _, v := range input.ValidChoices {
+		if v == choice {
+			return true
+		}
+	}
+	return false
+}
+
+func playerColorStyle(idx int) string {
+	colors := []string{"#2ecc71", "#f1c40f", "#9b59b6", "#3498db"}
+	return fmt.Sprintf("color: %s; font-weight: bold;", colors[idx%len(colors)])
+}
+
+func farmTurnClass(turn zcgame.Turn) string {
+	switch turn {
+	case zcgame.Morning:
+		return "farm-morning"
+	case zcgame.Afternoon:
+		return "farm-afternoon"
+	case zcgame.Night:
+		return "farm-night"
+	default:
+		return ""
+	}
+}

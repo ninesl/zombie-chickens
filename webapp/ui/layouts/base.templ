@@ -1,0 +1,445 @@
+package layouts
+
+templ Base(title string) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>{ title }</title>
+			<script src="https://unpkg.com/htmx.org@2.0.4"></script>
+			<script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
+			<style>
+				* {
+					box-sizing: border-box;
+				}
+				body {
+					font-family: monospace;
+					background: #1a1a2e;
+					color: #eee;
+					padding: 20px;
+					margin: 0;
+					min-height: 100vh;
+					display: flex;
+					flex-direction: column;
+					align-items: center;
+				}
+				h1 {
+					text-align: center;
+					color: #e94560;
+				}
+				.game-container {
+					max-width: 1400px;
+					width: 100%;
+				}
+				.player-card {
+					border: 1px solid #444;
+					padding: 15px;
+					margin: 10px 0;
+					background: #16213e;
+					border-radius: 8px;
+				}
+				.player-card.current {
+					border-color: #e94560;
+					border-width: 2px;
+					box-shadow: 0 0 10px rgba(233, 69, 96, 0.3);
+				}
+				.player-card.active-input {
+					border-color: #f1c40f;
+					border-width: 3px;
+					box-shadow: 0 0 15px rgba(241, 196, 15, 0.5);
+					animation: activeInputPulse 1.5s ease-in-out infinite;
+				}
+				@keyframes activeInputPulse {
+					0%, 100% { box-shadow: 0 0 15px rgba(241, 196, 15, 0.5); }
+					50% { box-shadow: 0 0 25px rgba(241, 196, 15, 0.8); }
+				}
+				.player-header {
+					display: flex;
+					align-items: center;
+					gap: 10px;
+					margin-bottom: 10px;
+				}
+				.stack {
+					display: inline-flex;
+					align-items: center;
+					gap: 10px;
+					margin: 10px;
+					padding: 15px;
+					background: #0f3460;
+					border-radius: 8px;
+				}
+				.farm {
+					margin: 10px 0;
+					padding: 15px;
+					border-radius: 8px;
+					transition: background-color 0.3s ease;
+				}
+				.farm-morning {
+					background: linear-gradient(135deg, #1a3a5c 0%, #2d5a7b 100%);
+					border: 1px solid #3498db;
+				}
+				.farm-afternoon {
+					background: linear-gradient(135deg, #4a3728 0%, #6b4423 100%);
+					border: 1px solid #e67e22;
+				}
+				.farm-night {
+					background: linear-gradient(135deg, #1a1a2e 0%, #2d1f3d 100%);
+					border: 1px solid #9b59b6;
+				}
+				.farm-label {
+					color: #888;
+					margin-bottom: 5px;
+				}
+				.hand {
+					display: flex;
+					flex-wrap: wrap;
+					gap: 15px;
+					margin: 15px 0;
+					justify-content: center;
+				}
+				.hand-item {
+					display: flex;
+					flex-direction: column;
+					align-items: center;
+					padding: 10px;
+					background: #533483;
+					border-radius: 8px;
+				}
+				.hand-idx {
+					font-size: 1.2em;
+					color: #fff;
+					font-weight: bold;
+					margin-bottom: 8px;
+				}
+				.farm-item {
+					display: inline-flex;
+					align-items: center;
+					position: relative;
+				}
+				.farm-item-img {
+					width: 150px;
+					height: 250px;
+					object-fit: contain;
+				}
+				.one-time-use::after {
+					content: "*";
+					color: #e94560;
+					font-size: 2em;
+					font-weight: bold;
+					position: absolute;
+					top: -10px;
+					right: -10px;
+				}
+				.zombie-card {
+					display: flex;
+					align-items: center;
+					gap: 15px;
+					background: #2c3e50;
+					padding: 15px;
+					margin: 10px 0;
+					border-radius: 8px;
+					border-left: 4px solid #9b59b6;
+				}
+				.zombie-img {
+					width: 250px;
+					height: 250px;
+					object-fit: contain;
+				}
+				.zombie-info {
+					flex: 1;
+				}
+				.zombie-traits {
+					display: flex;
+					flex-wrap: wrap;
+					gap: 5px;
+					margin-top: 8px;
+				}
+				.zombie-trait {
+					display: inline-block;
+					padding: 4px 10px;
+					border-radius: 4px;
+					font-size: 0.9em;
+					font-weight: bold;
+				}
+				.trait-invisible { background: #9b59b6; }
+				.trait-flying { background: #3498db; }
+				.trait-climbing { background: #f1c40f; color: #000; }
+				.trait-bulletproof { background: #2980b9; }
+				.trait-fireproof { background: #e74c3c; }
+				.trait-timid { background: #2ecc71; color: #000; }
+				.trait-exploding { background: #e67e22; }
+				.event-card {
+					background: #2c3e50;
+					padding: 15px;
+					margin: 10px 0;
+					border-radius: 8px;
+					border-left: 4px solid #e74c3c;
+				}
+				.input-prompt {
+					background: #16213e;
+					border: 2px solid #e94560;
+					border-radius: 8px;
+					padding: 20px;
+					margin: 20px 0;
+					text-align: center;
+				}
+				.input-prompt strong {
+					display: block;
+					margin-bottom: 15px;
+					font-size: 1.1em;
+				}
+				.choice-btn {
+					background: #e94560;
+					color: white;
+					border: none;
+					padding: 12px 24px;
+					margin: 5px;
+					cursor: pointer;
+					font-family: monospace;
+					font-size: 1.1em;
+					border-radius: 6px;
+					transition: background 0.2s;
+				}
+				.choice-btn:hover {
+					background: #ff6b6b;
+				}
+				.stats {
+					color: #888;
+					margin-bottom: 15px;
+					text-align: center;
+				}
+				.turn-indicator {
+					font-size: 1.4em;
+					margin: 15px 0;
+					text-align: center;
+				}
+				.morning { color: #3498db; }
+				.afternoon { color: #e67e22; }
+				.night { color: #9b59b6; }
+				.public-cards {
+					display: flex;
+					justify-content: center;
+					gap: 10px;
+					margin: 15px 0;
+					padding: 10px;
+					background: #0f3460;
+					border-radius: 8px;
+				}
+				hr {
+					border: none;
+					border-top: 1px solid #333;
+					margin: 20px 0;
+				}
+				.lobby-form {
+					text-align: center;
+					margin: 20px 0;
+				}
+				.lobby-form input {
+					padding: 12px 15px;
+					font-size: 1em;
+					font-family: monospace;
+					background: #0f3460;
+					border: 1px solid #444;
+					border-radius: 6px;
+					color: #eee;
+					margin-right: 10px;
+				}
+				.lobby-form button {
+					padding: 12px 25px;
+					font-size: 1em;
+					font-family: monospace;
+					background: #e94560;
+					border: none;
+					border-radius: 6px;
+					color: white;
+					cursor: pointer;
+				}
+				.lobby-form button:hover {
+					background: #ff6b6b;
+				}
+				.player-list {
+					margin: 20px 0;
+					text-align: center;
+				}
+				.player-list h3 {
+					color: #e94560;
+				}
+				.player-list-item {
+					padding: 8px 0;
+					font-size: 1.1em;
+				}
+				.night-cards {
+					margin: 10px 0;
+				}
+				.night-cards-count {
+					color: #9b59b6;
+					font-weight: bold;
+				}
+				/* Clickable cards and stacks */
+				.stacks-container {
+					display: flex;
+					flex-wrap: wrap;
+					gap: 10px;
+				}
+				.stack-form, .hand-form, .item-form, .action-form {
+					display: inline-block;
+					margin: 0;
+					padding: 0;
+				}
+				.clickable {
+					cursor: pointer;
+					transition: all 0.2s ease;
+					position: relative;
+				}
+				.clickable::after {
+					content: '';
+					position: absolute;
+					inset: -4px;
+					border: 3px solid #e94560;
+					border-radius: 12px;
+					animation: pulse 1.5s ease-in-out infinite;
+				}
+				@keyframes pulse {
+					0%, 100% { opacity: 1; box-shadow: 0 0 10px #e94560; }
+					50% { opacity: 0.5; box-shadow: 0 0 20px #e94560; }
+				}
+				.clickable:hover {
+					transform: scale(1.05);
+					z-index: 10;
+				}
+				.clickable:hover::after {
+					border-color: #ff6b6b;
+					box-shadow: 0 0 25px #ff6b6b;
+				}
+				button.stack {
+					background: #0f3460;
+					border: none;
+					padding: 15px;
+					border-radius: 8px;
+					display: inline-flex;
+					align-items: center;
+					gap: 10px;
+				}
+				button.hand-item {
+					background: #533483;
+					border: none;
+					padding: 10px;
+					border-radius: 8px;
+					display: flex;
+					flex-direction: column;
+					align-items: center;
+				}
+				.farm-item-btn {
+					background: transparent;
+					border: none;
+					padding: 0;
+					margin: 0;
+					cursor: pointer;
+				}
+				.new-stack {
+					min-width: 150px;
+					min-height: 250px;
+					border: 2px dashed #666;
+					display: flex;
+					align-items: center;
+					justify-content: center;
+				}
+				.new-stack-label {
+					color: #888;
+					font-size: 1.2em;
+					font-weight: bold;
+				}
+				.new-stack:hover .new-stack-label {
+					color: #fff;
+				}
+				/* Action buttons */
+				.input-actions {
+					display: flex;
+					flex-wrap: wrap;
+					justify-content: center;
+					gap: 10px;
+					margin-top: 15px;
+				}
+				.input-message {
+					margin-bottom: 10px;
+				}
+				.action-btn {
+					padding: 15px 30px;
+					font-size: 1.2em;
+					font-family: monospace;
+					font-weight: bold;
+					border: none;
+					border-radius: 8px;
+					cursor: pointer;
+					transition: all 0.2s ease;
+					text-transform: uppercase;
+				}
+				.action-btn:hover {
+					transform: scale(1.05);
+				}
+				.action-skip {
+					background: #7f8c8d;
+					color: white;
+				}
+				.action-skip:hover {
+					background: #95a5a6;
+				}
+				.action-yes {
+					background: #27ae60;
+					color: white;
+				}
+				.action-yes:hover {
+					background: #2ecc71;
+				}
+				.action-no {
+					background: #c0392b;
+					color: white;
+				}
+				.action-no:hover {
+					background: #e74c3c;
+				}
+				.action-confirm {
+					background: #3498db;
+					color: white;
+				}
+				.action-confirm:hover {
+					background: #5dade2;
+				}
+				.action-damage {
+					background: #8e44ad;
+					color: white;
+				}
+				.action-damage:hover {
+					background: #9b59b6;
+				}
+				.action-new {
+					background: #16a085;
+					color: white;
+				}
+				.action-new:hover {
+					background: #1abc9c;
+				}
+				.action-draw {
+					background: #2980b9;
+					color: white;
+				}
+				.action-draw:hover {
+					background: #3498db;
+				}
+				.action-public {
+					background: #d35400;
+					color: white;
+				}
+				.action-public:hover {
+					background: #e67e22;
+				}
+			</style>
+		</head>
+		<body>
+			<div class="game-container">
+				{ children... }
+			</div>
+		</body>
+	</html>
+}

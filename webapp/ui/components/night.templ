@@ -1,0 +1,98 @@
+package components
+
+import (
+	"fmt"
+	"github.com/ninesl/zombie-chickens/zcgame"
+)
+
+templ NightCards(cards zcgame.NightCards, isCurrentPlayer bool) {
+	<div>
+		if !isCurrentPlayer {
+			<span>NightCard x { fmt.Sprint(len(cards)) }</span>
+		} else if len(cards) == 0 {
+			<span>NightCard x 0</span>
+		} else {
+			<span>NightCard x { fmt.Sprint(len(cards) - 1) }</span>
+			{{ card := cards[0] }}
+			if card.IsZombie() {
+				@ZombieCard(card.ZombieKey)
+			} else if card.IsEvent() {
+				@EventCard(card.Event.Name, card.Event.Description)
+			}
+		}
+	</div>
+}
+
+templ ZombieCard(zombieKey int) {
+	{{ zc := zcgame.ZombieChickens[zombieKey] }}
+	<div class="zombie-card">
+		<img src="/assets/zombiechicken.png" alt="Zombie Chicken" class="zombie-img"/>
+		<div class="zombie-info">
+			<strong>{ zc.Name }</strong>
+			<div class="zombie-traits">
+				@ZombieTraits(zc.Traits)
+			</div>
+		</div>
+	</div>
+}
+
+templ ZombieTraits(traits zcgame.ZombieTraits) {
+	<span>|</span>
+	for _, trait := range traits {
+		@ZombieTrait(trait)
+		<span>|</span>
+	}
+}
+
+templ ZombieTrait(trait zcgame.ZombieTrait) {
+	<span class={ "zombie-trait", traitClass(trait) }>{ traitString(trait) }</span>
+}
+
+templ EventCard(name, description string) {
+	<div class="event-card">
+		<strong>{ name }</strong>
+		<div>| <em>{ description }</em> |</div>
+	</div>
+}
+
+func traitClass(t zcgame.ZombieTrait) string {
+	switch t {
+	case zcgame.Invisible:
+		return "trait-invisible"
+	case zcgame.Flying:
+		return "trait-flying"
+	case zcgame.Climbing:
+		return "trait-climbing"
+	case zcgame.Bulletproof:
+		return "trait-bulletproof"
+	case zcgame.Fireproof:
+		return "trait-fireproof"
+	case zcgame.Timid:
+		return "trait-timid"
+	case zcgame.Exploding:
+		return "trait-exploding"
+	default:
+		return ""
+	}
+}
+
+func traitString(t zcgame.ZombieTrait) string {
+	switch t {
+	case zcgame.Invisible:
+		return "Invisible"
+	case zcgame.Flying:
+		return "Flying"
+	case zcgame.Climbing:
+		return "Climbing"
+	case zcgame.Bulletproof:
+		return "Bulletproof"
+	case zcgame.Fireproof:
+		return "Fireproof"
+	case zcgame.Timid:
+		return "Timid"
+	case zcgame.Exploding:
+		return "Exploding"
+	default:
+		return "???"
+	}
+}

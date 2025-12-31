@@ -1,0 +1,138 @@
+package components
+
+import (
+	"fmt"
+	"github.com/ninesl/zombie-chickens/zcgame"
+	"github.com/ninesl/zombie-chickens/webapp/router/endpoints"
+)
+
+type BoardProps struct {
+	Game         zcgame.GameView
+	PendingInput *zcgame.PlayerInputNeeded
+	GameOver     bool
+}
+
+templ GameBoard(props BoardProps) {
+	<div id={ endpoints.IDGameBoard }>
+		@Stats(props.Game)
+		@TurnIndicator(props.Game)
+		@PublicCards(props.Game.PublicDayCards())
+		<hr/>
+		for i, pv := range props.Game.Players() {
+			@PlayerCard(pv, i, props.Game.CurrentPlayerIdx(), props.Game.ActiveInputPlayerIdx(), props.Game.Turn(), props.PendingInput)
+			if i < props.Game.PlayerCount() - 1 {
+				<hr/>
+			}
+		}
+		if props.GameOver {
+			<hr/>
+			@GameOverMessage()
+		}
+	</div>
+}
+
+templ Stats(game zcgame.GameView) {
+	<div class="stats">
+		Zombies Killed: { fmt.Sprint(countZombiesKilled(game)) } | 
+		Events Played: { fmt.Sprint(countEventsPlayed(game)) } | 
+		Day Cards Discarded: { fmt.Sprint(countDayCardsDiscarded(game)) }
+	</div>
+}
+
+templ TurnIndicator(game zcgame.GameView) {
+	<div class="turn-indicator">
+		<span class={ turnClass(game.Turn()) }>{ turnString(game.Turn()) }</span>
+		<span> { fmt.Sprint(game.NightNum()) }</span>
+	</div>
+}
+
+templ PublicCards(cards zcgame.PublicDayCards) {
+	<div class="public-cards">
+		<span>Public cards:</span>
+		@FarmItem(cards[0])
+		@FarmItem(cards[1])
+	</div>
+}
+
+templ StagePrompt(stage zcgame.StageInTurn) {
+	<div class="stats">
+		<em>{ stageString(stage) }</em>
+	</div>
+}
+
+templ GameOverMessage() {
+	<div class="event-card">
+		<strong>GAME OVER</strong> - All players have been eliminated!
+	</div>
+}
+
+// Helper functions
+
+func countZombiesKilled(game zcgame.GameView) int {
+	count := 0
+	for _, card := range game.DiscardedNightCards() {
+		if card.IsZombie() {
+			count++
+		}
+	}
+	return count
+}
+
+func countEventsPlayed(game zcgame.GameView) int {
+	count := 0
+	for _, card := range game.DiscardedNightCards() {
+		if card.IsEvent() {
+			count++
+		}
+	}
+	return count
+}
+
+func countDayCardsDiscarded(game zcgame.GameView) int {
+	count := 0
+	for _, c := range game.DiscardedDayCards() {
+		count += c
+	}
+	return count
+}
+
+func turnClass(t zcgame.Turn) string {
+	switch t {
+	case zcgame.Morning:
+		return "morning"
+	case zcgame.Afternoon:
+		return "afternoon"
+	case zcgame.Night:
+		return "night"
+	default:
+		return ""
+	}
+}
+
+func turnString(t zcgame.Turn) string {
+	switch t {
+	case zcgame.Morning:
+		return "Morning"
+	case zcgame.Afternoon:
+		return "Afternoon"
+	case zcgame.Night:
+		return "Night"
+	default:
+		return "Day"
+	}
+}
+
+func stageString(s zcgame.StageInTurn) string {
+	switch s {
+	case zcgame.OptionalDiscard:
+		return "Discard a card to draw a card from the deck (optional)"
+	case zcgame.Play2Cards:
+		return "Play 2 cards to your farm"
+	case zcgame.Draw2Cards:
+		return "Draw 2 cards from the deck or the 2 face-up cards"
+	case zcgame.Nighttime:
+		return "Progress through the night..."
+	default:
+		return ""
+	}
+}

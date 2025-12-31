@@ -1,0 +1,59 @@
+package components
+
+import "github.com/ninesl/zombie-chickens/zcgame"
+
+templ FarmItem(item zcgame.FarmItemType) {
+	<span class={ "farm-item", templ.KV("one-time-use", item.IsOneTimeUse()) } title={ farmItemString(item) }>
+		<img src={ farmItemImageURL(item) } alt={ farmItemString(item) } class="farm-item-img"/>
+	</span>
+}
+
+func farmItemImageURL(f zcgame.FarmItemType) string {
+	switch f {
+	case zcgame.HayBale:
+		return "/assets/haybale.png"
+	case zcgame.Scarecrow:
+		return "/assets/scarecrow.png"
+	case zcgame.Shotgun:
+		return "/assets/shotgun.png"
+	case zcgame.Ammo:
+		return "/assets/ammo.png"
+	case zcgame.BoobyTrap:
+		return "/assets/boobytrap.png"
+	case zcgame.Shield:
+		return "/assets/shield.png"
+	case zcgame.Flamethrower:
+		return "/assets/flamethrower.png"
+	case zcgame.Fuel:
+		return "/assets/fuel.png"
+	case zcgame.WOLR:
+		return "/assets/wolr.png"
+	default:
+		return ""
+	}
+}
+
+func farmItemString(f zcgame.FarmItemType) string {
+	switch f {
+	case zcgame.HayBale:
+		return "Hay Bale"
+	case zcgame.Scarecrow:
+		return "Scarecrow"
+	case zcgame.Shotgun:
+		return "Shotgun"
+	case zcgame.Ammo:
+		return "Ammo"
+	case zcgame.BoobyTrap:
+		return "Booby Trap"
+	case zcgame.Shield:
+		return "Shield"
+	case zcgame.Flamethrower:
+		return "Flamethrower"
+	case zcgame.Fuel:
+		return "Fuel"
+	case zcgame.WOLR:
+		return "W.O.L.R"
+	default:
+		return "???"
+	}
+}

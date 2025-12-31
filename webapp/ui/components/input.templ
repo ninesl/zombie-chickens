@@ -1,0 +1,88 @@
+package components
+
+import (
+	"fmt"
+	"github.com/ninesl/zombie-chickens/zcgame"
+	"github.com/ninesl/zombie-chickens/webapp/router/endpoints"
+)
+
+// InputPrompt shows contextual action buttons (SKIP, YES/NO, CONTINUE, etc.)
+// Card/stack selection is handled inline in the player components
+templ InputPrompt(input *zcgame.PlayerInputNeeded, currentPlayerIdx int) {
+	<div class="input-prompt">
+		<div class="input-message"><strong>{ input.Message }</strong></div>
+		<div class="input-actions">
+			switch input.Context {
+			case zcgame.InputContextDiscard:
+				// Optional discard - show SKIP button (0)
+				if hasChoice(input.ValidChoices, 0) {
+					@ActionButton(0, "SKIP", "action-skip")
+				}
+			case zcgame.InputContextDraw:
+				// Draw phase - show draw options
+				@DrawOptions(input.ValidChoices)
+			case zcgame.InputContextShield:
+				// Shield decision - YES (1) / NO (0)
+				if hasChoice(input.ValidChoices, 1) {
+					@ActionButton(1, "USE SHIELD", "action-yes")
+				}
+				if hasChoice(input.ValidChoices, 0) {
+					@ActionButton(0, "DON'T USE", "action-no")
+				}
+			case zcgame.InputContextConfirm:
+				// Confirmation - just continue
+				@ActionButton(0, "CONTINUE", "action-confirm")
+			case zcgame.InputContextEventDiscard:
+				// Event discard - cards are clickable, but might need DONE button
+				if hasChoice(input.ValidChoices, 0) {
+					@ActionButton(0, "DONE", "action-confirm")
+				}
+		case zcgame.InputContextDefense:
+			// Defense - stacks are clickable, show TAKE DAMAGE if -1 is valid
+			if hasChoice(input.ValidChoices, -1) {
+				@ActionButton(-1, "TAKE DAMAGE", "action-damage")
+			}
+		case zcgame.InputContextPlayCard:
+			// Choosing stack to place card - NEW STACK is shown in the farm area, no buttons needed here
+		case zcgame.InputContextPlay:
+			// Selecting a card from hand - cards are clickable, no buttons needed
+		default:
+			// Unknown context - no default buttons (edge cases can be handled as needed)
+		}
+		</div>
+	</div>
+}
+
+templ ActionButton(choice int, label string, class string) {
+	<form class="action-form" hx-post={ endpoints.GameInput } hx-swap="none">
+		<input type="hidden" name={ endpoints.FieldChoice } value={ fmt.Sprint(choice) }/>
+		<button type="submit" class={ "action-btn", class }>
+			{ label }
+		</button>
+	</form>
+}
+
+templ DrawOptions(choices []int) {
+	// Draw options: 1=take public cards, 2=draw from deck
+	if hasChoice(choices, 1) {
+		@ActionButton(1, "TAKE PUBLIC CARDS", "action-public")
+	}
+	if hasChoice(choices, 2) {
+		@ActionButton(2, "DRAW FROM DECK", "action-draw")
+	}
+	// Fallback for other draw choices
+	for _, choice := range choices {
+		if choice != 1 && choice != 2 {
+			@ActionButton(choice, fmt.Sprint(choice), "")
+		}
+	}
+}
+
+func hasChoice(choices []int, target int) bool {
+	for _, c := range choices {
+		if c == target {
+			return true
+		}
+	}
+	return false
+}
