@@ -100,7 +100,7 @@ func (g *gameState) doPlayerDayTurn() *PlayerInputNeeded {
 			return &PlayerInputNeeded{
 				Context:      InputContextDiscard,
 				RenderType:   RenderNormal,
-				Message:      "1-5 to discard, 0 to skip",
+				Message:      "Discard a card to draw a replacement, or skip",
 				ValidChoices: []int{1, 2, 3, 4, 5, 0},
 			}
 
@@ -109,7 +109,7 @@ func (g *gameState) doPlayerDayTurn() *PlayerInputNeeded {
 			return &PlayerInputNeeded{
 				Context:      InputContextPlay,
 				RenderType:   RenderNormal,
-				Message:      "1-5 in your hand to play",
+				Message:      "Select first card to play to your farm",
 				ValidChoices: []int{1, 2, 3, 4, 5},
 			}
 
@@ -121,7 +121,7 @@ func (g *gameState) doPlayerDayTurn() *PlayerInputNeeded {
 			return &PlayerInputNeeded{
 				Context:      InputContextPlay,
 				RenderType:   RenderNormal,
-				Message:      "1-4 in your hand to play",
+				Message:      "Select second card to play to your farm",
 				ValidChoices: []int{1, 2, 3, 4},
 			}
 
@@ -134,7 +134,7 @@ func (g *gameState) doPlayerDayTurn() *PlayerInputNeeded {
 			return &PlayerInputNeeded{
 				Context:      InputContextDraw,
 				RenderType:   RenderNormal,
-				Message:      fmt.Sprintf("1 for public cards (%s, %s), 2 for deck", g.PublicDayCards[0], g.PublicDayCards[1]),
+				Message:      "Choose how to draw cards",
 				ValidChoices: []int{1, 2},
 			}
 
@@ -167,7 +167,7 @@ func (g *gameState) createStackSelectionInput() *PlayerInputNeeded {
 	return &PlayerInputNeeded{
 		Context:      InputContextPlayCard,
 		RenderType:   RenderNormal,
-		Message:      fmt.Sprintf("%s: %s (0 for new stack, or choose stack)", g.PendingCardItem, result.Message),
+		Message:      fmt.Sprintf("Place %s: select a stack or start a new one", g.PendingCardItem),
 		ValidChoices: choices,
 		Item:         g.PendingCardItem,
 		ValidStacks:  result.ValidStacks,
@@ -320,7 +320,7 @@ func (g *gameState) processNightCards() *PlayerInputNeeded {
 			return &PlayerInputNeeded{
 				Context:      InputContextConfirm,
 				RenderType:   RenderForNight,
-				Message:      fmt.Sprintf("%s: zombie auto-killed, press 0 to continue", g.CurrentPlayer().Name),
+				Message:      fmt.Sprintf("%s: zombie auto-killed by %s!", g.CurrentPlayer().Name, g.LastUsedDefenseDesc),
 				ValidChoices: []int{0},
 			}
 
@@ -328,7 +328,7 @@ func (g *gameState) processNightCards() *PlayerInputNeeded {
 			return &PlayerInputNeeded{
 				Context:      InputContextConfirm,
 				RenderType:   RenderForNight,
-				Message:      fmt.Sprintf("%s: no defense, will lose a life, press 0 to continue", g.CurrentPlayer().Name),
+				Message:      fmt.Sprintf("%s: no defense available, will lose a life", g.CurrentPlayer().Name),
 				ValidChoices: []int{0},
 			}
 
@@ -336,7 +336,7 @@ func (g *gameState) processNightCards() *PlayerInputNeeded {
 			return &PlayerInputNeeded{
 				Context:      InputContextConfirm,
 				RenderType:   RenderForNight,
-				Message:      fmt.Sprintf("%s has been eliminated! Press 0 to continue", g.CurrentPlayer().Name),
+				Message:      fmt.Sprintf("%s has been eliminated!", g.CurrentPlayer().Name),
 				ValidChoices: []int{0},
 			}
 
@@ -347,7 +347,7 @@ func (g *gameState) processNightCards() *PlayerInputNeeded {
 			return &PlayerInputNeeded{
 				Context:      InputContextShield,
 				RenderType:   RenderForNight,
-				Message:      fmt.Sprintf("%s: use shield to save stack from exploding zombie? (1=yes, 0=no)", g.CurrentPlayer().Name),
+				Message:      fmt.Sprintf("%s: use shield to save stack from exploding zombie?", g.CurrentPlayer().Name),
 				ValidChoices: []int{1, 0},
 			}
 
@@ -355,7 +355,7 @@ func (g *gameState) processNightCards() *PlayerInputNeeded {
 			return &PlayerInputNeeded{
 				Context:      InputContextConfirm,
 				RenderType:   RenderForNight,
-				Message:      fmt.Sprintf("%s: will lose a life, press 0 to continue", g.CurrentPlayer().Name),
+				Message:      fmt.Sprintf("%s: will lose a life", g.CurrentPlayer().Name),
 				ValidChoices: []int{0},
 			}
 
@@ -364,7 +364,7 @@ func (g *gameState) processNightCards() *PlayerInputNeeded {
 			return &PlayerInputNeeded{
 				Context:      InputContextConfirm,
 				RenderType:   RenderForNight,
-				Message:      fmt.Sprintf("%s: %s Press 0 to continue", g.PendingEventName, g.PendingEventDesc),
+				Message:      fmt.Sprintf("%s: %s", g.PendingEventName, g.PendingEventDesc),
 				ValidChoices: []int{0},
 			}
 
@@ -503,6 +503,8 @@ func (g *gameState) processZombieCard(nightCard NightCard) *PlayerInputNeeded {
 	// Check for free kill first
 	freeStacks := player.Farm.FindStacksThatCanKillForFree(zc)
 	if len(freeStacks) > 0 {
+		// Capture defense description BEFORE using the stack (stack may be modified)
+		g.LastUsedDefenseDesc = player.Farm.Stacks[freeStacks[0]].DescribeDefense(zc)
 		player.Farm.UseDefenseStack(freeStacks[0], zc, false, g)
 		// Don't remove night card yet - keep it visible for confirmation display
 		g.NightSubStage = NightSubStageZombieAutoKilled
@@ -537,7 +539,7 @@ func (g *gameState) createDefenseChoiceInput() *PlayerInputNeeded {
 	return &PlayerInputNeeded{
 		Context:      InputContextDefense,
 		RenderType:   RenderForNight,
-		Message:      fmt.Sprintf("%s: choose stack to use or -1 to take life (stacks: %s)", player.Name, intSliceChoices(allStacks1Based...)),
+		Message:      fmt.Sprintf("%s: Select a stack to defend, or take damage", player.Name),
 		ValidChoices: choices,
 		ValidStacks:  allStacks,
 	}
@@ -725,6 +727,7 @@ func (g *gameState) resetNightState() {
 	g.EventDiscardPlayerIdx = 0
 	g.EventDiscardRemaining = 0
 	g.EventDiscardTotal = 0
+	g.LastUsedDefenseDesc = ""
 }
 
 // ContinueDay advances the game state through the current day cycle.

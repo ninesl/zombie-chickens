@@ -174,6 +174,9 @@ type gameState struct {
 	// Pending event display state
 	PendingEventName string // Event name saved for confirmation display
 	PendingEventDesc string // Event description saved for confirmation display
+
+	// Defense display state
+	LastUsedDefenseDesc string // Description of defense used (e.g., "Scarecrow", "Hay Wall")
 }
 
 // ZombieTrait represents a special ability that a zombie chicken can have.

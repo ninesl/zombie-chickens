@@ -175,6 +175,31 @@ func (f *Farm) FindStacksThatCanKillForFree(zc ZombieChicken) []int {
 	return result
 }
 
+// DescribeDefense returns a human-readable description of what defense a stack provides.
+// This is used for display messages when a zombie is killed.
+func (s Stack) DescribeDefense(zc ZombieChicken) string {
+	// Check in order of specificity
+	if s.HasItem(WOLR) {
+		return "W.O.L.R."
+	}
+	if s.HasItem(Scarecrow) && zc.Traits.HasTrait(Timid) {
+		return "Scarecrow"
+	}
+	if countItemInStack(s, HayBale) >= 3 {
+		return "Hay Wall"
+	}
+	if s.HasItem(Shotgun) && s.HasItem(Ammo) {
+		return "Shotgun"
+	}
+	if s.HasItem(Flamethrower) && s.HasItem(Fuel) {
+		return "Flamethrower"
+	}
+	if s.HasItem(BoobyTrap) {
+		return "Booby Trap"
+	}
+	return "defense" // fallback
+}
+
 // UseDefenseStack uses the defense at the given stack index to defeat a zombie.
 // This handles all the side effects of using a defense:
 //   - WOLR destroys the entire farm
