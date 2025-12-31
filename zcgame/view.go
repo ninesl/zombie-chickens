@@ -54,6 +54,17 @@ func (v GameView) CurrentPlayerIdx() int {
 	return v.game.CurrentPlayerIdx
 }
 
+// ActiveInputPlayerIdx returns the index of the player who should provide input.
+// This differs from CurrentPlayerIdx during event discards, where multiple players
+// take turns discarding but CurrentPlayerIdx stays on the player who drew the event.
+func (v GameView) ActiveInputPlayerIdx() int {
+	// During event discards, calculate the actual player who needs to discard
+	if v.game.NightSubStage == NightSubStageEventDiscard {
+		return (v.game.EventDiscardStartIdx + v.game.EventDiscardPlayerIdx) % len(v.game.Players)
+	}
+	return v.game.CurrentPlayerIdx
+}
+
 // PublicDayCards returns a copy of the public day cards.
 func (v GameView) PublicDayCards() PublicDayCards {
 	return v.game.PublicDayCards // Already a value type [2]FarmItemType
@@ -111,6 +122,17 @@ func (v GameView) Player(idx int) PlayerView {
 // CurrentPlayer returns the PlayerView for the current player.
 func (v GameView) CurrentPlayer() PlayerView {
 	return v.Player(v.game.CurrentPlayerIdx)
+}
+
+// PlayerIdxByName returns the current index of a player by name, or -1 if not found.
+// This is useful when players can be eliminated and indices shift.
+func (v GameView) PlayerIdxByName(name string) int {
+	for i, p := range v.game.Players {
+		if p.Name == name {
+			return i
+		}
+	}
+	return -1
 }
 
 // HasLivingPlayers returns true if at least one player has lives remaining.
