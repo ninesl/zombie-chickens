@@ -1,9 +1,8 @@
 package zcgame
 
 // This file contains Stringer implementations for all game types.
-// Output format depends on cliMode:
-//   - CLI mode (true): ANSI escape codes for colored terminal output
-//   - API mode (false): Plain text suitable for JSON serialization
+// All methods return plain text suitable for API/JSON serialization.
+// CLI formatting with ANSI colors is handled by the cligame package.
 
 import (
 	"fmt"
@@ -13,32 +12,6 @@ import (
 // String returns the display name for a FarmItemType.
 // One-time-use items are marked with an asterisk (*).
 func (f FarmItemType) String() string {
-	if cliMode {
-		switch f {
-		case HayBale:
-			return brightGrey + italic + "Hay Bale" + reset
-		case Scarecrow:
-			return brightGrey + italic + "Scarecrow" + reset
-		case Shotgun:
-			return brightGrey + italic + "Shotgun" + reset
-		case Ammo:
-			return brightGrey + italic + "Ammo" + reset + redStar()
-		case BoobyTrap:
-			return brightGrey + italic + "Booby Trap" + reset + redStar()
-		case Shield:
-			return brightGrey + italic + "Shield" + reset + redStar()
-		case Flamethrower:
-			return brightGrey + italic + "Flamethrower" + reset
-		case Fuel:
-			return brightGrey + italic + "Fuel" + reset
-		case WOLR:
-			return brightGrey + italic + "W.O.L.R" + reset + redStar()
-		default:
-			return fmt.Sprintf("FarmItemType ERROR %d", int(f))
-		}
-	}
-
-	// Non-CLI mode
 	switch f {
 	case HayBale:
 		return "Hay Bale"
@@ -64,22 +37,6 @@ func (f FarmItemType) String() string {
 }
 
 func (t Turn) String() string {
-	if cliMode {
-		switch t {
-		case Morning:
-			return brightBlue + italic + "Morning" + reset
-		case Afternoon:
-			return orange + italic + "Afternoon" + reset
-		case Night:
-			return brightPurple + italic + "Night" + reset
-		case Day:
-			return italic + "Day" + reset
-		default:
-			return fmt.Sprintf("Turn ERROR %d", int(t))
-		}
-	}
-
-	// Non-CLI mode
 	switch t {
 	case Morning:
 		return "Morning"
@@ -95,28 +52,6 @@ func (t Turn) String() string {
 }
 
 func (zt ZombieTrait) String() string {
-	if cliMode {
-		switch zt {
-		case Invisible:
-			return purple + "Invisible" + reset
-		case Flying:
-			return brightBlue + "Flying" + reset
-		case Climbing:
-			return yellow + "Climbing" + reset
-		case Bulletproof:
-			return blue + "Bulletproof" + reset
-		case Fireproof:
-			return red + "Fireproof" + reset
-		case Timid:
-			return brightGreen + "Timid" + reset
-		case Exploding:
-			return orange + "Exploding" + reset
-		default:
-			return fmt.Sprintf("ZombieTrait ERROR %d", int(zt))
-		}
-	}
-
-	// Non-CLI mode
 	switch zt {
 	case Invisible:
 		return "Invisible"
@@ -143,22 +78,6 @@ func intSliceChoices(s ...int) string {
 }
 
 func (s StageInTurn) String() string {
-	if cliMode {
-		switch s {
-		case OptionalDiscard:
-			return bold + italic + "Discard a card to draw a card from the deck (optional)" + reset
-		case Play2Cards:
-			return bold + italic + "Play 2 cards to your farm" + reset
-		case Draw2Cards:
-			return bold + italic + "Draw 2 cards from the deck or the 2 face-up cards" + reset
-		case Nighttime:
-			return bold + italic + "Progress through the night..." + reset
-		default:
-			return fmt.Sprintf("StageInTurn ERROR %d", int(s))
-		}
-	}
-
-	// Non-CLI mode
 	switch s {
 	case OptionalDiscard:
 		return "Discard a card to draw a card from the deck (optional)"
@@ -242,9 +161,6 @@ func (n NightCards) StringWithVisibility(isCurrentPlayer bool, turn Turn) string
 }
 
 func (e Event) String() string {
-	if cliMode {
-		return bold + e.Name + reset + "\n| " + italic + e.Description + reset + " |"
-	}
 	return e.Name + "\n| " + e.Description + " |"
 }
 
@@ -252,11 +168,6 @@ func (zt ZombieTraits) String() string {
 	if len(zt) == 0 {
 		log.Fatal("a zombie should always have traits")
 	}
-
-	// NOTE: Sorting commented out - order preserved as-is for frontend consistency
-	// sort.Slice(zt, func(i, j int) bool {
-	// 	return zt[i] < zt[j]
-	// })
 
 	result := "|"
 	for _, trait := range zt {
@@ -266,9 +177,6 @@ func (zt ZombieTraits) String() string {
 }
 
 func (z ZombieChicken) String() string {
-	if cliMode {
-		return fmt.Sprintf("%s%s%s\n%s", bold, z.Name, reset, z.Traits)
-	}
 	return fmt.Sprintf("%s\n%s", z.Name, z.Traits)
 }
 
@@ -294,27 +202,7 @@ func (s Stacks) StringForNight() string {
 }
 
 // stringWithIndices returns a string representation of stacks.
-// NOTE: Sorting commented out - order preserved as-is for frontend consistency
 func (s Stacks) stringWithIndices(showIndices bool) string {
-	// NOTE: Sorting commented out - order preserved as-is for frontend consistency
-	// Sort each inner stack by FarmItemType
-	// for i := range s {
-	// 	sort.Slice(s[i], func(a, b int) bool {
-	// 		return s[i][a] < s[i][b]
-	// 	})
-	// }
-
-	// Sort stacks by first element
-	// sort.Slice(s, func(i, j int) bool {
-	// 	if len(s[i]) == 0 {
-	// 		return false
-	// 	}
-	// 	if len(s[j]) == 0 {
-	// 		return true
-	// 	}
-	// 	return s[i][0] < s[j][0]
-	// })
-
 	result := ""
 	idx := 1
 	for i, stack := range s {
@@ -324,7 +212,6 @@ func (s Stacks) stringWithIndices(showIndices bool) string {
 			result += fmt.Sprintf("%s", stack)
 		}
 		if i < len(s)-1 {
-			// avoids trailing whitespace
 			result += "\n"
 		}
 	}
@@ -369,10 +256,6 @@ func (h *Hand) StringWithoutIndices() string {
 }
 
 func (h *Hand) stringWithIndices(showIndices bool) string {
-	// NOTE: Sorting commented out - order preserved as-is for frontend consistency
-	// Hand is sorted explicitly before [3] and [4] assignments in game.go
-	// h.Sort()
-
 	result := "Hand: { "
 	first := true
 	idx := 1
@@ -397,11 +280,6 @@ func (h *Hand) stringWithIndices(showIndices bool) string {
 }
 
 func (s Stack) String() string {
-	// NOTE: Sorting commented out - order preserved as-is for frontend consistency
-	// sort.Slice(s, func(i, j int) bool {
-	// 	return s[i] < s[j]
-	// })
-
 	result := "{ "
 	for i, item := range s {
 		result += fmt.Sprintf("%s", item)
@@ -414,11 +292,6 @@ func (s Stack) String() string {
 }
 
 func (s Stack) stringWithIndices(idx *int) string {
-	// NOTE: Sorting commented out - order preserved as-is for frontend consistency
-	// sort.Slice(s, func(i, j int) bool {
-	// 	return s[i] < s[j]
-	// })
-
 	result := "{ "
 	for i, item := range s {
 		result += fmt.Sprintf("%d: %s", *idx, item)
