@@ -2,6 +2,9 @@ package zcgame
 
 import "fmt"
 
+// DebugMode puts events on top of night deck for testing
+var DebugMode = false
+
 // createDayDeck creates a shuffled deck of day cards based on DayCardAmounts.
 func createDayDeck() Stack {
 	var deck = Stack{}
@@ -67,13 +70,25 @@ func (g *gameState) dealPublicDayCards() {
 func CreateNewGame(playerNames ...string) (GameView, error) {
 	if len(playerNames) == 0 {
 		return GameView{}, fmt.Errorf("must provide at least 1 player")
-	} else if len(playerNames) > 4 {
-		return GameView{}, fmt.Errorf("must provide max 4 player names")
+	}
+	// } else if len(playerNames) > 4 {
+	// return GameView{}, fmt.Errorf("must provide max 4 player names")
+	// }
+
+	var (
+		dayDeck   = Stack{}
+		nightDeck = []NightCard{}
+	)
+
+	decksNeeded := (len(playerNames) + 3) / 4
+	for range decksNeeded {
+		dayDeck = append(dayDeck, createDayDeck()...)
+		nightDeck = append(nightDeck, createNightDeck()...)
 	}
 
 	var g = &gameState{
-		DayDeck:             createDayDeck(),
-		NightDeck:           createNightDeck(),
+		DayDeck:             dayDeck,
+		NightDeck:           nightDeck,
 		Turn:                Morning,
 		StageInTurn:         OptionalDiscard,
 		CurrentPlayerIdx:    0, //redundant
@@ -89,6 +104,10 @@ func CreateNewGame(playerNames ...string) (GameView, error) {
 	}
 	if err := g.assertNewGame(); err != nil {
 		return GameView{}, err
+	}
+
+	if DebugMode {
+		g.DebugEventsOnTop()
 	}
 
 	return NewGameView(g), nil
@@ -123,16 +142,9 @@ func (g *gameState) DebugEventsOnTop() {
 }
 
 // createPlayer creates a new player with starting lives and a 5-card hand.
-// The player's name may be colored with ANSI codes if CLI mode is enabled.
 func createPlayer(g *gameState, name string, numPlayers int, playerIdx int) *Player {
-	// Apply color to player name if CLI mode
-	displayName := name
-	if cliMode {
-		displayName = playerColors[playerIdx%len(playerColors)] + name + reset
-	}
-
 	return &Player{
-		Name:  displayName,
+		Name:  name,
 		Lives: StartingLivesLookup[numPlayers],
 		Farm: &Farm{
 			Stacks:     Stacks{},
