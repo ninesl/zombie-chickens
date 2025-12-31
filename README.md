@@ -7,44 +7,30 @@ A CLI card game where players defend their farms from waves of zombie chickens.
 - Go 1.21 or later
 - No external dependencies (pure standard library)
 
-## Installation
+## Run the Game
 
-### Option 1: Go Install (Recommended)
+### CLI Mode
 
 ```bash
 go install github.com/ninesl/zombie-chickens@latest
-zombie-chickens Alice Bob
+zombie-chickens PlayerName1 PlayerName2
 ```
-
-### Option 2: Go Run (No Installation)
 
 ```bash
-go run github.com/ninesl/zombie-chickens@latest Alice Bob
+go run . player1 player2              # CLI with player names
+go run . -debug player1 player2       # Debug mode (events on top of night deck)
 ```
-
-### Option 3: Build from Source
-
-```bash
-git clone https://github.com/ninesl/zombie-chickens.git
-cd zombie-chickens
-go build .
-./zombie-chickens Alice Bob
-```
-
-## CLI Usage
 
 The CLI requires at least one player name (1-4 players supported).
 
+### Web Mode
+
 ```bash
-# Single player
-zombie-chickens Alice
-
-# Multiple players
-zombie-chickens Alice Bob
-
-# Debug mode (events appear on top of night deck)
-zombie-chickens -debug Alice Bob
+go run . -web                         # Web server at http://localhost:8080
+go run . -web -debug                  # Web server with debug mode
 ```
+
+The web version provides a browser-based UI with real-time updates via SSE.
 
 ## How to Play
 
@@ -160,3 +146,44 @@ These functions support terminal rendering with ANSI colors.
 | `IsCLIMode() bool` | Check if CLI mode is enabled |
 | `RefreshRender(v GameView)` | Clear screen and print game state |
 | `GatherCLIInput(v GameView, inputNeeded *PlayerInputNeeded) int` | Read validated input from stdin |
+
+
+OUTPUT:
+
+```
+Zombies Killed: 0 | Events Played: 0 | Day Cards Discarded: 2
+Afternoon 1
+{ Ammo*, Ammo* }
+---
+Lance : 5hp
+
+Farm:
+{ Shotgun, Ammo* }
+{ Shield* }
+Hand: { 1:Hay Bale, 2:Scarecrow, 3:Ammo*, 4:Flamethrower }
+---
+Play 2 cards to your farm
+Lance's Afternoon
+1-4 in your hand to play:4
+```
+
+```
+Zombies Killed: 0 | Events Played: 0 | Day Cards Discarded: 2
+Night 1
+{ Shield*, Ammo* }
+---
+Lance : 5hp
+NightCard x 0
+Climber
+| Climbing | Fireproof | Exploding |
+Farm:
+1:{ Shotgun, Ammo* }
+2:{ Shield* }
+3:{ Flamethrower }
+Hand: { Hay Bale, Scarecrow, Ammo*, Ammo*, Ammo* }
+---
+Progress through the night...
+Lance's Night
+Lance: choose stack to use or -1 to take life (stacks: [1]):1
+```
+
